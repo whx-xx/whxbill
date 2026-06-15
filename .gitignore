@@ -20,3 +20,5 @@ deploy/redis/data/
 android-app/.gradle/
 android-app/**/build/
 android-app/local.properties
+docs/
+deploy/
