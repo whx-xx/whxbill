@@ -1,0 +1,52 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${WHX_DB_HOST:mysql}:${WHX_DB_PORT:3306}/${WHX_DB_NAME:whx_bill}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${WHX_DB_USERNAME:root}
+    password: ${WHX_DB_PASSWORD:rootroot}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${WHX_REDIS_HOST:redis}
+      port: ${WHX_REDIS_PORT:6379}
+      password: ${WHX_REDIS_PASSWORD:}
+      database: ${WHX_REDIS_DATABASE:0}
+      timeout: 5s
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+app:
+  jwt:
+    secret: ${WHX_JWT_SECRET}
+    access-token-expire-seconds: 7200
+    refresh-token-expire-seconds: 604800
+    issuer: whx-bill
+  cors:
+    allowed-origins:
+      - ${WHX_CORS_ALLOWED_ORIGINS:http://39.106.168.139}
+  redis:
+    key-prefix: "whx:bill:"
+  oss:
+    endpoint: ${WHX_OSS_ENDPOINT:}
+    bucket-name: ${WHX_OSS_BUCKET:}
+    access-key-id: ${WHX_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${WHX_OSS_ACCESS_KEY_SECRET:}
+    public-host: ${WHX_OSS_PUBLIC_HOST:}
+
+server:
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    com.whxbill.backend: info

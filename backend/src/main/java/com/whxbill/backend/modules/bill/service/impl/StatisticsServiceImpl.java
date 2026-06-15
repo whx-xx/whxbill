@@ -1,0 +1,111 @@
+package com.whxbill.backend.modules.bill.service.impl;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.whxbill.backend.common.cache.RedisCacheSupport;
+import com.whxbill.backend.modules.bill.dto.StatisticsQuery;
+import com.whxbill.backend.modules.bill.mapper.BizBillMapper;
+import com.whxbill.backend.modules.bill.service.StatisticsService;
+import com.whxbill.backend.security.SecurityUtils;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class StatisticsServiceImpl implements StatisticsService {
+
+    public static final String DASHBOARD_CACHE_PREFIX = "whx:bill:dashboard:v2:";
+
+    private static final Duration CACHE_TTL = Duration.ofMinutes(20);
+    private static final Duration LOCK_TTL = Duration.ofSeconds(8);
+
+    private final BizBillMapper bizBillMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
+    private final RedisCacheSupport redisCacheSupport;
+
+    @Override
+    public Map<String, Object> getDashboard(String month) {
+        StatisticsQuery query = new StatisticsQuery();
+        query.setMonth(month);
+        query.setMode("month");
+        return getDashboard(query);
+    }
+
+    @Override
+    public Map<String, Object> getDashboard(StatisticsQuery query) {
+        DateRange range = resolveDateRange(query);
+        boolean includeChildren = Boolean.TRUE.equals(query.getIncludeChildren());
+        String cacheKey = DASHBOARD_CACHE_PREFIX + SecurityUtils.getUserId() + ":" + query.getBookId() + ":"
+            + range.startDate() + ":" + range.endDate() + ":" + includeChildren;
+        String lockKey = "whx:bill:lock:dashboard:" + SecurityUtils.getUserId() + ":" + query.getBookId() + ":"
+            + range.startDate() + ":" + range.endDate() + ":" + includeChildren;
+        String cached = stringRedisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            if (RedisCacheSupport.NULL_MARKER.equals(cached)) {
+                return Map.of("summary", Map.of(), "expenseCategories", java.util.List.of(), "incomeCategories", java.util.List.of(), "trend", java.util.List.of());
+            }
+            try {
+                return objectMapper.readValue(cached, new TypeReference<>() {
+                });
+            } catch (Exception ignored) {
+            }
+        }
+        boolean locked = redisCacheSupport.tryLock(lockKey, LOCK_TTL);
+        try {
+            if (!locked) {
+                try {
+                    Thread.sleep(120L);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                }
+                return getDashboard(query);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("summary", bizBillMapper.selectSummary(SecurityUtils.getUserId(), query.getBookId(), range.startDate(), range.endDate()));
+            result.put("expenseCategories", bizBillMapper.selectCategoryStats(SecurityUtils.getUserId(), query.getBookId(),
+                "EXPENSE", range.startDate(), range.endDate(), includeChildren));
+            result.put("incomeCategories", bizBillMapper.selectCategoryStats(SecurityUtils.getUserId(), query.getBookId(),
+                "INCOME", range.startDate(), range.endDate(), includeChildren));
+            result.put("categories", result.get("expenseCategories"));
+            result.put("trend", "year".equalsIgnoreCase(query.getMode())
+                ? bizBillMapper.selectTrendByMonth(SecurityUtils.getUserId(), query.getBookId(), range.startDate(), range.endDate())
+                : bizBillMapper.selectTrendByDay(SecurityUtils.getUserId(), query.getBookId(), range.startDate(), range.endDate()));
+            try {
+                stringRedisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result),
+                    redisCacheSupport.withRandomSeconds(CACHE_TTL, 180));
+            } catch (Exception ignored) {
+            }
+            return result;
+        } finally {
+            if (locked) {
+                redisCacheSupport.unlock(lockKey);
+            }
+        }
+    }
+
+    private DateRange resolveDateRange(StatisticsQuery query) {
+        String mode = query.getMode() == null ? "month" : query.getMode();
+        if ("year".equalsIgnoreCase(mode)) {
+            int year = query.getYear() == null || query.getYear().isBlank() ? LocalDate.now().getYear() : Integer.parseInt(query.getYear());
+            return new DateRange(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+        }
+        if ("custom".equalsIgnoreCase(mode) && query.getStartDate() != null && query.getEndDate() != null) {
+            return new DateRange(query.getStartDate(), query.getEndDate());
+        }
+        YearMonth month = query.getMonth() == null || query.getMonth().isBlank()
+            ? YearMonth.now()
+            : YearMonth.parse(query.getMonth());
+        return new DateRange(month.atDay(1), month.atEndOfMonth());
+    }
+
+    private record DateRange(LocalDate startDate, LocalDate endDate) {
+    }
+}

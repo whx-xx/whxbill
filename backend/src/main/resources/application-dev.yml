@@ -1,0 +1,70 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/whx_bill?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: rootroot
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      timeout: 5s
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+app:
+  jwt:
+    secret: ${WHX_JWT_SECRET}
+    access-token-expire-seconds: 7200
+    refresh-token-expire-seconds: 604800
+    issuer: whx-bill
+  cors:
+    allowed-origins:
+      - http://localhost:*
+      - http://127.0.0.1:*
+      - http://10.0.2.2:*
+      - http://10.0.3.2:*
+      - http://192.168.*:*
+      - http://172.16.*:*
+      - http://172.17.*:*
+      - http://172.18.*:*
+      - http://172.19.*:*
+      - http://172.20.*:*
+      - http://172.21.*:*
+      - http://172.22.*:*
+      - http://172.23.*:*
+      - http://172.24.*:*
+      - http://172.25.*:*
+      - http://172.26.*:*
+      - http://172.27.*:*
+      - http://172.28.*:*
+      - http://172.29.*:*
+      - http://172.30.*:*
+      - http://172.31.*:*
+      - capacitor://localhost
+      - ionic://localhost
+  redis:
+    key-prefix: "whx:bill:"
+  oss:
+    endpoint: ${WHX_OSS_ENDPOINT:}
+    bucket-name: ${WHX_OSS_BUCKET:}
+    access-key-id: ${WHX_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${WHX_OSS_ACCESS_KEY_SECRET:}
+    public-host: ${WHX_OSS_PUBLIC_HOST:}
+
+logging:
+  level:
+    com.whxbill.backend: info

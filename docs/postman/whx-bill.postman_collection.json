@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "WHX Bill API",
+    "_postman_id": "8fa4bdb8-7f10-4471-8fd7-c4fac44e8f4e",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\"username\":\"demo\",\"password\":\"Demo@123456\"}" }
+      }
+    },
+    {
+      "name": "Bills Page",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/bills?pageNum=1&pageSize=20&month=2026-06", "host": ["{{baseUrl}}"], "path": ["api", "bills"], "query": [{ "key": "pageNum", "value": "1" }, { "key": "pageSize", "value": "20" }, { "key": "month", "value": "2026-06" }] }
+      }
+    },
+    {
+      "name": "Dashboard Statistics",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/statistics/dashboard?month=2026-06", "host": ["{{baseUrl}}"], "path": ["api", "statistics", "dashboard"], "query": [{ "key": "month", "value": "2026-06" }] }
+      }
+    },
+    {
+      "name": "User Messages",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/user/messages", "host": ["{{baseUrl}}"], "path": ["api", "user", "messages"] }
+      }
+    },
+    {
+      "name": "Update User Profile",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/user/profile", "host": ["{{baseUrl}}"], "path": ["api", "user", "profile"] },
+        "body": { "mode": "raw", "raw": "{\"nickname\":\"演示用户\",\"email\":\"demo@whxbill.com\",\"phone\":\"13800000000\",\"avatarUrl\":\"https://example.com/avatar.png\"}" }
+      }
+    },
+    {
+      "name": "Upload File",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/files/upload", "host": ["{{baseUrl}}"], "path": ["api", "files", "upload"] },
+        "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "" }] }
+      }
+    },
+    {
+      "name": "Admin Save Notice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/admin/notices", "host": ["{{baseUrl}}"], "path": ["api", "admin", "notices"] },
+        "body": { "mode": "raw", "raw": "{\"title\":\"系统公告\",\"content\":\"<p>六月预算提醒</p>\",\"coverUrl\":\"\",\"publishStatus\":1}" }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" }
+  ]
+}
