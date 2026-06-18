@@ -720,6 +720,13 @@ public class BillServiceImpl implements BillService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteBills(List<Long> billIds) {
+        // 批量删除复用单条删除，确保权限归属、余额回滚和预算刷新规则完全一致。
+        billIds.forEach(this::deleteBill);
+    }
+
+    @Override
     public List<BizBill> listBillsByDate(String date, Long bookId) {
         return bizBillMapper.selectList(new LambdaQueryWrapper<BizBill>()
             .eq(BizBill::getUserId, SecurityUtils.getUserId())

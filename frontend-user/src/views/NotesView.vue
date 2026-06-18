@@ -3,8 +3,9 @@
     <section class="notes-editor-card">
       <div class="notes-card-head">
         <div>
-          <span class="notes-eyebrow">富文本笔记</span>
-          <h2>公告与笔记</h2>
+          <span class="notes-eyebrow">Personal Notes</span>
+          <h2>我的笔记</h2>
+          <p>记录预算复盘、消费提醒和理财想法，数据保存在当前浏览器本地。</p>
         </div>
         <div class="notes-actions">
           <el-button @click="resetDraft">清空</el-button>
@@ -14,11 +15,7 @@
 
       <div class="notes-summary-grid">
         <div>
-          <span>公告数量</span>
-          <strong>{{ notices.length }}</strong>
-        </div>
-        <div>
-          <span>我的笔记</span>
+          <span>笔记数量</span>
           <strong>{{ notes.length }}</strong>
         </div>
         <div>
@@ -39,38 +36,24 @@
       </el-form>
     </section>
 
-    <aside class="notes-side">
-      <section class="notes-list-card">
-        <div class="notes-list-head">
-          <h3>最新公告</h3>
-          <el-button :icon="Refresh" text type="primary" :loading="loadingNotices" @click="loadNotices">刷新</el-button>
-        </div>
-        <el-empty v-if="notices.length === 0" description="暂无公告" />
-        <div v-else class="notes-scroll-list">
-          <article v-for="notice in notices" :key="notice.id" class="notes-item">
-            <h4>{{ notice.title }}</h4>
-            <div class="notes-rich-text" v-html="sanitizeHtml(notice.content)"></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="notes-list-card">
-        <div class="notes-list-head">
-          <h3>我的笔记</h3>
+    <aside class="notes-list-card">
+      <div class="notes-list-head">
+        <div>
+          <h3>笔记列表</h3>
           <span>{{ notes.length }} 条</span>
         </div>
-        <el-empty v-if="notes.length === 0" description="暂无笔记" />
-        <div v-else class="notes-scroll-list">
-          <article v-for="note in notes" :key="note.id" class="notes-item clickable" @click="loadNote(note)">
-            <div class="notes-item-title">
-              <h4>{{ note.title }}</h4>
-              <el-button :icon="Delete" text type="danger" @click.stop="deleteNote(note.id)" />
-            </div>
-            <small>{{ note.updatedAt }}</small>
-            <div class="notes-rich-text" v-html="sanitizeHtml(note.content)"></div>
-          </article>
-        </div>
-      </section>
+      </div>
+      <el-empty v-if="notes.length === 0" description="暂无笔记" />
+      <div v-else class="notes-scroll-list">
+        <article v-for="note in notes" :key="note.id" class="notes-item" @click="loadNote(note)">
+          <div class="notes-item-title">
+            <h4>{{ note.title }}</h4>
+            <el-button :icon="Delete" text type="danger" @click.stop="deleteNote(note.id)" />
+          </div>
+          <small>{{ note.updatedAt }}</small>
+          <div class="notes-rich-text" v-html="sanitizeHtml(note.content)"></div>
+        </article>
+      </div>
     </aside>
   </div>
 </template>
@@ -78,11 +61,10 @@
 <script setup lang="ts">
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
-import { Delete, Refresh } from '@element-plus/icons-vue'
+import { Delete } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import request from '@/utils/request'
 
 type NoteDraft = {
   id?: number
@@ -98,17 +80,14 @@ const storageKey = 'whx-bill-user-notes'
 const editorRef = ref<HTMLDivElement>()
 const formRef = ref<FormInstance>()
 const quillRef = ref<Quill>()
-const notices = ref<any[]>([])
 const notes = ref<SavedNote[]>([])
 const saving = ref(false)
-const loadingNotices = ref(false)
 const draft = reactive<NoteDraft>({
   title: '本月预算复盘',
   content: '<p>记录今天的理财感受、预算调整或阅读到的消费提醒。</p>'
 })
 
 const draftTextLength = computed(() => getPlainText(draft.content).length)
-
 const rules: FormRules = {
   title: [
     { required: true, message: '请输入笔记标题', trigger: 'blur' },
@@ -139,7 +118,6 @@ onMounted(async () => {
       formRef.value?.validateField('content').catch(() => undefined)
     })
   }
-  await loadNotices()
 })
 
 function loadLocalNotes() {
@@ -164,9 +142,7 @@ function resetDraft() {
   draft.id = undefined
   draft.title = ''
   draft.content = ''
-  if (quillRef.value) {
-    quillRef.value.setText('')
-  }
+  quillRef.value?.setText('')
   formRef.value?.clearValidate()
 }
 
@@ -216,19 +192,8 @@ async function deleteNote(noteId: number) {
   await ElMessageBox.confirm('删除后不可恢复，是否继续？', '删除笔记', { type: 'warning' })
   notes.value = notes.value.filter((item) => item.id !== noteId)
   persistNotes()
-  if (draft.id === noteId) {
-    resetDraft()
-  }
+  if (draft.id === noteId) resetDraft()
   ElMessage.success('笔记已删除')
-}
-
-async function loadNotices() {
-  loadingNotices.value = true
-  try {
-    notices.value = await request.get('/api/user/notices')
-  } finally {
-    loadingNotices.value = false
-  }
 }
 
 function sanitizeHtml(html?: string) {
@@ -254,7 +219,158 @@ function sanitizeHtml(html?: string) {
       element.setAttribute('rel', 'noopener noreferrer')
     }
   })
-
   return template.innerHTML
 }
 </script>
+
+<style scoped lang="stylus">
+.notes-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
+  gap: 0.75rem;
+  min-height: calc(100vh - 5.75rem);
+}
+
+.notes-editor-card,
+.notes-list-card {
+  min-width: 0;
+  padding: 1rem;
+  background: #fff;
+  border: 0.0625rem solid #e3ecef;
+  border-radius: 0.75rem;
+  box-shadow: 0 0.75rem 1.75rem rgba(23, 37, 45, 0.05);
+}
+
+.notes-card-head,
+.notes-list-head,
+.notes-actions,
+.notes-item-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.notes-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.625rem;
+  border-radius: 62.4375rem;
+  background: #e8f7f4;
+  color: #168f82;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.notes-card-head h2,
+.notes-list-head h3,
+.notes-item h4 {
+  margin: 0;
+  color: #132933;
+}
+
+.notes-card-head h2 {
+  margin-top: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.notes-card-head p,
+.notes-list-head span,
+.notes-item small {
+  color: #71808d;
+  font-size: 0.8125rem;
+}
+
+.notes-card-head p {
+  margin: 0.375rem 0 0;
+}
+
+.notes-summary-grid {
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.notes-summary-grid > div {
+  padding: 0.875rem;
+  border-radius: 0.625rem;
+  background: #f7fbfa;
+}
+
+.notes-summary-grid span {
+  color: #71808d;
+  font-size: 0.8125rem;
+}
+
+.notes-summary-grid strong {
+  display: block;
+  margin-top: 0.375rem;
+  color: #132933;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.notes-editor-wrap {
+  border: 0.0625rem solid #dfeceb;
+  border-radius: 0.625rem;
+  overflow: hidden;
+}
+
+.notes-editor {
+  min-height: 21rem;
+  background: #fff;
+}
+
+.notes-scroll-list {
+  margin-top: 0.75rem;
+  max-height: calc(100vh - 11rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  scrollbar-width: none;
+}
+
+.notes-scroll-list::-webkit-scrollbar {
+  display: none;
+}
+
+.notes-item {
+  padding: 0.875rem;
+  border-radius: 0.625rem;
+  background: #f8fbfb;
+  border: 0.0625rem solid #edf2f4;
+  cursor: pointer;
+}
+
+.notes-rich-text {
+  margin-top: 0.5rem;
+  color: #3e505a;
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+
+.notes-rich-text :deep(p) {
+  margin: 0.375rem 0;
+}
+
+@media (max-width: 73.75rem) {
+  .notes-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.5rem) {
+  .notes-card-head,
+  .notes-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .notes-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

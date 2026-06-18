@@ -9,7 +9,7 @@ import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GraphicComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import App from './App.vue'
 import router from './router'
-import './styles.css'
+import './styles.styl'
 
 use([CanvasRenderer, BarChart, LineChart, PieChart, GraphicComponent, GridComponent, LegendComponent, TooltipComponent])
 

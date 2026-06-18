@@ -94,4 +94,10 @@ public class AccountServiceImpl implements AccountService {
         }
         bizAccountMapper.deleteById(accountId);
     }
+
+    @Override
+    public void deleteAccounts(List<Long> accountIds) {
+        // 批量删除仍逐条走引用校验，避免绕过“已有账单不可删”的限制。
+        accountIds.forEach(this::deleteAccount);
+    }
 }

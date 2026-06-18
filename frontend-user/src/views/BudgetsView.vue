@@ -46,10 +46,9 @@
           <div class="manage-control-actions">
             <el-button :icon="Refresh" @click="resetFilters">重置</el-button>
             <el-button class="manage-danger-button" :disabled="!selectedIds.length" :icon="Delete" :loading="loading.deleting" type="danger" plain @click="removeSelectedBudgets">删除</el-button>
-            <el-button class="manage-primary-button" :icon="Plus" type="primary" @click="openCreateDialog">新增预算</el-button>
           </div>
         </div>
-        <div class="manage-filter-grid" style="margin-top:12px">
+        <div class="manage-filter-grid" style="margin-top:0.75rem">
           <el-select v-model="selectedMonth" placeholder="预算月份">
             <el-option v-for="item in monthOptions" :key="item" :label="item" :value="item" />
           </el-select>
@@ -93,7 +92,7 @@
         <div class="manage-toolbar">
           <div>
             <h3 style="margin:0">预算列表</h3>
-            <div class="manage-subtle-text" style="margin-top:6px">查看月总预算和分类预算的执行情况</div>
+            <div class="manage-subtle-text" style="margin-top:0.375rem">查看月总预算和分类预算的执行情况</div>
           </div>
           <div class="manage-toolbar-group">
             <span class="manage-subtle-text">已选 {{ selectedIds.length }} 条</span>
@@ -178,7 +177,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑预算' : '新增预算'" width="min(760px, calc(100vw - 24px))">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑预算' : '新增预算'" width="min(47.5rem, calc(100vw - 1.5rem))">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="budget-dialog-form">
         <div class="budget-dialog-intro">
           <strong>{{ form.id ? '调整预算方案' : '新建预算方案' }}</strong>
@@ -665,7 +664,11 @@ async function saveBudget() {
 
   loading.saving = true
   try {
-    await request.post('/api/budgets', form)
+    if (form.id) {
+      await request.put(`/api/budgets/${form.id}`, form)
+    } else {
+      await request.post('/api/budgets', form)
+    }
     ElMessage.success(form.id ? '预算已更新' : '预算已新增')
     dialogVisible.value = false
     await loadBudgets()
@@ -694,7 +697,7 @@ async function removeSelectedBudgets() {
   })
   loading.deleting = true
   try {
-    await Promise.all(selectedIds.value.map((id) => request.delete(`/api/budgets/${id}`)))
+    await request.delete('/api/budgets/batch', { data: { ids: selectedIds.value } })
     ElMessage.success('选中预算已删除')
     await loadBudgets()
   } finally {
@@ -750,66 +753,179 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="stylus">
+.manage-shell
+  gap 1rem
+
+.manage-hero
+  padding 1.125rem 1.25rem
+  border 0.0625rem solid rgba(64, 141, 134, 0.12)
+  border-radius 0.5rem
+  background linear-gradient(135deg, #ffffff 0%, #f2fbf9 58%, #eef7ff 100%)
+  box-shadow 0 0.75rem 1.75rem rgba(29, 50, 61, 0.05)
+
+.manage-hero h2
+  font-size 1.625rem
+  font-weight 900
+  color #132933
+
+.manage-hero p
+  max-width 38rem
+  color #667985
+
+.manage-section-eyebrow
+  display inline-flex
+  align-items center
+  min-height 1.5rem
+  padding 0 0.625rem
+  border-radius 62.4375rem
+  background #e9f8f5
+  color #168a78
+  font-weight 800
+
+.manage-workbench
+  display grid
+  gap 1rem
+  background transparent
+  border 0
+  border-radius 0
+  overflow visible
+
+.manage-workbench .manage-stats
+  padding 0
+  background transparent
+  border-bottom 0
+
+.manage-workbench .manage-stat
+  min-height 6.25rem
+  border 0.0625rem solid rgba(64, 141, 134, 0.1)
+  border-radius 0.5rem
+  background linear-gradient(180deg, #ffffff 0%, #fbfefd 100%)
+  box-shadow 0 0.625rem 1.5rem rgba(29, 50, 61, 0.045)
+
+.manage-stat::after
+  content ''
+  position absolute
+  left 1rem
+  right 1rem
+  bottom 0
+  height 0.1875rem
+  border-radius 62.4375rem
+  background linear-gradient(90deg, #26a69a, rgba(79, 142, 247, 0.65))
+
+.manage-stat-label
+  font-weight 700
+  color #7a8d98
+
+.manage-stat-value
+  font-size 1.625rem
+  font-weight 900
+  color #122934
+
+.manage-workbench .manage-control-card,
+.budget-alert-card,
+.manage-workbench .manage-table-card
+  border 0.0625rem solid rgba(64, 141, 134, 0.1)
+  border-radius 0.5rem
+  background #ffffff
+  box-shadow 0 0.625rem 1.5rem rgba(29, 50, 61, 0.045)
+  overflow hidden
+
+.manage-workbench .manage-control-card
+  padding 1rem
+
+.manage-workbench .manage-table-card
+  border-radius 0.5rem
+
+.manage-table-card .manage-toolbar
+  padding 1rem 1.125rem
+  margin 0
+  background linear-gradient(180deg, #fbfefd 0%, #ffffff 100%)
+  border-bottom 0.0625rem solid #edf3f2
+
+.manage-table-card :deep(.el-table)
+  --el-table-border-color #edf3f2
+  --el-table-header-bg-color #f5faf9
+  --el-table-row-hover-bg-color #f3fbf9
+
+.manage-table-card :deep(.el-table th.el-table__cell)
+  color #5f7580
+  font-weight 800
+
+.manage-table-card :deep(.el-table td.el-table__cell),
+.manage-table-card :deep(.el-table th.el-table__cell)
+  padding-top 0.875rem
+  padding-bottom 0.875rem
+
+.manage-table-card .manage-pagination
+  margin 0 1.125rem
+  padding 0.875rem 0 1rem
+
+.manage-progress-cell :deep(.el-progress-bar__outer)
+  background #edf3f2
+
+.manage-progress-cell :deep(.el-progress-bar__inner)
+  background linear-gradient(90deg, #26a69a, #4f8ef7)
+
 .budget-focus-ring {
-  border-radius: 12px;
-  box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.24), 0 14px 30px rgba(38, 166, 154, 0.08);
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 0.125rem rgba(38, 166, 154, 0.24), 0 0.875rem 1.875rem rgba(38, 166, 154, 0.08);
   transition: box-shadow 0.24s ease;
 }
 
 .budget-dialog-form {
   display: grid;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .budget-dialog-intro {
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 16px;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  border-radius: 1rem;
   background: linear-gradient(135deg, #f7fcfb 0%, #edf7f5 100%);
-  border: 1px solid rgba(83, 181, 171, 0.16);
+  border: 0.0625rem solid rgba(83, 181, 171, 0.16);
 }
 
 .budget-dialog-intro strong,
 .budget-dialog-card-head strong {
   color: #17252e;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
 }
 
 .budget-dialog-intro span,
 .budget-dialog-card-head small {
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 
 .budget-dialog-grid {
   display: grid;
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .budget-dialog-card {
-  padding: 16px;
-  border-radius: 18px;
+  padding: 1rem;
+  border-radius: 1.125rem;
   background: #fbfdfd;
-  border: 1px solid rgba(64, 141, 134, 0.1);
+  border: 0.0625rem solid rgba(64, 141, 134, 0.1);
 }
 
 .budget-dialog-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
   flex-wrap: wrap;
 }
 
 .budget-dialog-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .budget-dialog-category-item {
@@ -818,32 +934,33 @@ onMounted(async () => {
 
 .budget-alert-card {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
 }
 
 .budget-alert-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
 .budget-warning-list {
   display: grid;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .budget-warning-item {
   width: 100%;
-  border: 1px solid rgba(64, 141, 134, 0.12);
-  border-radius: 10px;
-  background: #fbfefd;
-  padding: 12px 14px;
+  border: 0.0625rem solid #edf3f2;
+  border-radius: 0.625rem;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfefd 100%);
+  padding: 0.75rem 0.875rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
@@ -851,14 +968,14 @@ onMounted(async () => {
 
 .budget-warning-item:hover {
   border-color: #9bd8d1;
-  background: #f5fbfa;
-  transform: translateY(-1px);
+  background: #f3fbf9;
+  transform: translateY(-0.0625rem);
 }
 
 .budget-warning-main,
 .budget-warning-side {
   display: grid;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .budget-warning-main strong {
@@ -868,7 +985,7 @@ onMounted(async () => {
 .budget-warning-main span,
 .budget-warning-side small {
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .budget-warning-side {
@@ -883,19 +1000,19 @@ onMounted(async () => {
 
 .budget-category-picker {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
   width: 100%;
 }
 
 .budget-total-option {
   width: 100%;
-  border: 1px solid #dce8e6;
-  border-radius: 14px;
+  border: 0.0625rem solid #dce8e6;
+  border-radius: 0.875rem;
   background: #f8fcfb;
-  padding: 12px 14px;
+  padding: 0.75rem 0.875rem;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  gap: 0.75rem;
   align-items: center;
   text-align: left;
   cursor: pointer;
@@ -906,45 +1023,45 @@ onMounted(async () => {
 .budget-total-option.active {
   border-color: #53b5ab;
   background: #eef8f6;
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .budget-total-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
   display: grid;
   place-items: center;
   background: #ffffff;
   color: #169980;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
-  box-shadow: 0 4px 12px rgba(38, 166, 154, 0.08);
+  box-shadow: 0 0.25rem 0.75rem rgba(38, 166, 154, 0.08);
 }
 
 .budget-total-option strong,
 .budget-category-block-head span {
   color: #17252e;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
 }
 
 .budget-total-option small,
 .budget-category-block-head small {
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .budget-category-block {
   width: 100%;
-  border-radius: 16px;
+  border-radius: 1rem;
   background: linear-gradient(180deg, #f7fbfa 0%, #edf6f4 100%);
-  padding: 14px;
+  padding: 0.875rem;
 }
 
 .budget-category-grid {
   display: grid;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .budget-category-primary-grid {
@@ -956,16 +1073,16 @@ onMounted(async () => {
   width: 100%;
   min-width: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: transparent;
-  min-height: 76px;
+  min-height: 4.75rem;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
+  gap: 0.5rem;
   cursor: pointer;
   color: #1d313c;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.2;
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
@@ -977,38 +1094,38 @@ onMounted(async () => {
 .budget-subcategory-panel button.active {
   background: #ffffff;
   color: #169980;
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .budget-category-primary-grid span,
 .budget-subcategory-panel span {
-  width: 38px;
-  height: 38px;
+  width: 2.375rem;
+  height: 2.375rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: #ffffff;
   color: inherit;
-  box-shadow: 0 2px 10px rgba(29, 50, 61, 0.06);
+  box-shadow: 0 0.125rem 0.625rem rgba(29, 50, 61, 0.06);
 }
 
 .budget-category-primary-grid .el-icon,
 .budget-subcategory-panel .el-icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .budget-subcategory-panel {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
+  gap: 0.625rem;
+  padding: 0.75rem;
   align-content: start;
-  border-radius: 16px;
+  border-radius: 1rem;
   background: rgba(255, 255, 255, 0.72);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 47.5rem) {
   .budget-dialog-fields,
   .budget-category-primary-grid,
   .budget-subcategory-panel {

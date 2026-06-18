@@ -11,4 +11,6 @@ public interface AccountService {
     BizAccount saveAccount(AccountSaveRequest request);
 
     void deleteAccount(Long accountId);
+
+    void deleteAccounts(List<Long> accountIds);
 }

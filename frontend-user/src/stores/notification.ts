@@ -14,6 +14,12 @@ export const useNotificationStore = defineStore('notification', {
     unreadCount: (state) => state.messages.filter((item) => item.readStatus === 0).length
   },
   actions: {
+    pushMessage(message: any) {
+      if (!message?.id || this.messages.some((item) => item.id === message.id)) {
+        return
+      }
+      this.messages.unshift(message)
+    },
     async loadMessages() {
       this.messages = await request.get('/api/user/messages')
     },
@@ -34,12 +40,12 @@ export const useNotificationStore = defineStore('notification', {
         this.connected = true
         client.subscribe('/user/queue/notifications', (message) => {
           const payload = JSON.parse(message.body)
-          this.messages.unshift(payload)
+          this.pushMessage(payload)
         })
         if (authStore.profile?.userId) {
           client.subscribe(`/topic/notifications/${authStore.profile.userId}`, (message) => {
             const payload = JSON.parse(message.body)
-            this.messages.unshift(payload)
+            this.pushMessage(payload)
           })
         }
       }

@@ -6,7 +6,6 @@
           <span class="ledger-eyebrow">搜索筛选</span>
           <h2>账单</h2>
         </div>
-        <el-button text type="primary" @click="resetFilters">重置</el-button>
       </div>
 
       <el-input
@@ -121,7 +120,9 @@
           <el-button :disabled="!bills.records.length" @click="toggleCurrentPageSelection">
             {{ isCurrentPageSelected ? '取消全选' : '全选本页' }}
           </el-button>
-          <el-button :icon="Download" :loading="loading.exporting" @click="exportBills">导出Excel</el-button>
+          <el-button :icon="Download" :loading="loading.exporting" @click="exportBills">
+            {{ loading.exporting ? `导出中 ${loading.exportProgress}%` : '导出Excel' }}
+          </el-button>
           <el-button :icon="UploadFilled" @click="router.push('/bill-import')">导入Excel</el-button>
           <el-button
             :disabled="!selectedIds.length"
@@ -168,7 +169,7 @@
             </div>
           </div>
           <div class="ledger-bill-amount" :class="row.billType === 'EXPENSE' ? 'expense' : 'income'">
-            {{ row.billType === 'EXPENSE' ? '-' : '+' }}{{ formatCurrency(row.amount) }}
+            {{ row.billType === 'EXPENSE' ? '-' : '+' }}{{ formatCurrency(row.amount, row.bookId) }}
           </div>
         </article>
       </div>
@@ -198,7 +199,7 @@
               <div class="ledger-detail-title">{{ categoryNameMap[selectedBill.categoryId] || '未分类' }}</div>
               <div class="ledger-detail-time">{{ formatBillDateTime(selectedBill) }}</div>
             </div>
-            <strong>{{ selectedBill.billType === 'EXPENSE' ? '-' : '+' }}{{ formatCurrency(selectedBill.amount) }}</strong>
+            <strong>{{ selectedBill.billType === 'EXPENSE' ? '-' : '+' }}{{ formatCurrency(selectedBill.amount, selectedBill.bookId) }}</strong>
           </div>
           <div class="ledger-detail-rows">
             <div><span>账单分类</span><strong>{{ categoryNameMap[selectedBill.categoryId] || '未分类' }}</strong></div>
@@ -251,12 +252,15 @@
             </div>
           </template>
         </div>
-        <el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" />
+        <div class="ledger-amount-field">
+          <span>{{ formCurrencyUnit }}</span>
+          <el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" />
+        </div>
         <el-button type="primary" size="large" style="width:100%" :loading="loading.saving" @click="saveBill">完成</el-button>
       </section>
     </aside>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑账单' : '新增账单'" width="min(880px, calc(100vw - 24px))">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑账单' : '新增账单'" width="min(55rem, calc(100vw - 1.5rem))">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="bill-dialog-form">
         <div class="bill-dialog-intro">
           <div>
@@ -322,7 +326,7 @@
             </div>
             <div class="bill-dialog-fields">
               <el-form-item label="归属账本" prop="bookId">
-                <el-select v-model="form.bookId" style="width:100%">
+                <el-select v-model="form.bookId" style="width:100%" @visible-change="handleBookSelectVisibleChange">
                   <el-option v-for="book in books" :key="book.id" :label="book.bookName" :value="book.id" />
                 </el-select>
               </el-form-item>
@@ -331,8 +335,11 @@
                   <el-option v-for="item in accounts" :key="item.id" :label="item.accountName" :value="item.id" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="金额" prop="amount" class="bill-dialog-amount-field">
-                <el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" />
+              <el-form-item :label="`金额（${formCurrencyUnit}）`" prop="amount" class="bill-dialog-amount-field">
+                <div class="ledger-amount-field">
+                  <span>{{ formCurrencyUnit }}</span>
+                  <el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" />
+                </div>
               </el-form-item>
               <el-form-item label="日期" prop="billTime" class="bill-dialog-date-field">
                 <el-date-picker
@@ -449,6 +456,7 @@ const bills = ref<{ total: number; records: any[] }>({ total: 0, records: [] })
 const billSummary = ref({ expense: 0, income: 0, balance: 0 })
 const accounts = ref<any[]>([])
 const categories = ref<any[]>([])
+const currencyDicts = ref<any[]>([])
 const selectedIds = ref<number[]>([])
 const selectedBill = ref<any>()
 const selectedQuickParentId = ref<number>()
@@ -470,7 +478,8 @@ const loading = reactive({
   list: false,
   saving: false,
   deleting: false,
-  exporting: false
+  exporting: false,
+  exportProgress: 0
 })
 
 const filters = reactive({
@@ -511,6 +520,9 @@ const rules: FormRules = {
 
 const accountNameMap = computed(() =>
   Object.fromEntries(accounts.value.map((item) => [item.id, item.accountName]))
+)
+const bookMap = computed(() =>
+  Object.fromEntries(books.value.map((item) => [item.id, item]))
 )
 const bookNameMap = computed(() =>
   Object.fromEntries(books.value.map((item) => [item.id, item.bookName]))
@@ -560,9 +572,53 @@ const summaryTags = computed(() => {
 const isCurrentPageSelected = computed(() =>
   bills.value.records.length > 0 && bills.value.records.every((item) => selectedIds.value.includes(item.id))
 )
+const currentBook = computed(() => bookMap.value[currentBookId.value as number])
+const formBook = computed(() => bookMap.value[form.bookId as number] || currentBook.value)
+const formCurrencyUnit = computed(() => currencyMeta(formBook.value?.currencyCode).unit)
+const fallbackCurrencies = [
+  { dictLabel: '人民币', dictValue: 'CNY', dictExtra: '{"symbol":"¥","locale":"zh-CN","fractionDigits":2}' },
+  { dictLabel: '美元', dictValue: 'USD', dictExtra: '{"symbol":"$","locale":"en-US","fractionDigits":2}' },
+  { dictLabel: '欧元', dictValue: 'EUR', dictExtra: '{"symbol":"€","locale":"de-DE","fractionDigits":2}' }
+]
 
-function formatCurrency(value: number | string) {
-  return `¥${Number(value || 0).toFixed(2)}`
+function currencyMeta(currencyCode?: string) {
+  const code = String(currencyCode || 'CNY').toUpperCase()
+  const item = (currencyDicts.value.length ? currencyDicts.value : fallbackCurrencies)
+    .find((dict) => String(dict.dictValue || '').toUpperCase() === code)
+  const extra = currencyExtra(item)
+  return {
+    locale: extra.locale || 'zh-CN',
+    currency: code,
+    unit: extra.symbol ? `${code} ${extra.symbol}` : code,
+    fractionDigits: Number.isFinite(Number(extra.fractionDigits)) ? Number(extra.fractionDigits) : 2
+  }
+}
+
+function formatCurrency(value: number | string, bookId?: number) {
+  const book = bookId ? bookMap.value[bookId] : currentBook.value
+  const meta = currencyMeta(book?.currencyCode)
+  return new Intl.NumberFormat(meta.locale, {
+    style: 'currency',
+    currency: meta.currency,
+    minimumFractionDigits: meta.fractionDigits,
+    maximumFractionDigits: meta.fractionDigits
+  }).format(Number(value || 0))
+}
+
+function currencyExtra(item?: any) {
+  try {
+    return JSON.parse(item?.dictExtra || '{}')
+  } catch {
+    return {}
+  }
+}
+
+async function loadCurrencyDicts() {
+  try {
+    currencyDicts.value = await request.get('/api/user/dicts/currency')
+  } catch {
+    currencyDicts.value = []
+  }
 }
 
 function formatDate(value?: string) {
@@ -588,6 +644,10 @@ function normalizeBillTime(row: any) {
 
 function datePart(value?: string) {
   return value ? value.slice(0, 10) : currentDate()
+}
+
+function toBackendDateTime(value?: string) {
+  return value ? value.replace(' ', 'T').slice(0, 19) : ''
 }
 
 function sourceTypeLabel(value?: string) {
@@ -801,7 +861,8 @@ function handleMonthChange() {
   filters.dateRange = []
 }
 
-function openCreateDialog() {
+async function openCreateDialog() {
+  await loadBooks(true)
   resetForm()
   dialogVisible.value = true
 }
@@ -828,6 +889,12 @@ async function loadReferenceData() {
   accounts.value = accountList
   categories.value = [...expenseCategories, ...incomeCategories]
   syncFormDefaults()
+}
+
+async function handleBookSelectVisibleChange(visible: boolean) {
+  if (visible) {
+    await loadBooks(true)
+  }
 }
 
 async function loadAccountsForBook(bookId?: number) {
@@ -882,10 +949,17 @@ async function loadBills() {
 async function exportBills() {
   if (!currentBookId.value || loading.exporting) return
   loading.exporting = true
+  loading.exportProgress = 0
   try {
     const blob = await request.download('/api/bills/export', {
-      params: billQueryParams()
+      params: billQueryParams(),
+      onDownloadProgress: (event) => {
+        if (event.total) {
+          loading.exportProgress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+        }
+      }
     })
+    loading.exportProgress = 100
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -917,13 +991,18 @@ async function saveBill() {
   try {
     const payload = { ...form }
     payload.billDate = datePart(payload.billTime as string)
+    payload.billTime = toBackendDateTime(payload.billTime as string)
     if (quickSave) {
       const categoryId = payload.categoryId as number
       payload.id = undefined
       payload.merchantName = payload.merchantName || categoryNameMap.value[categoryId] || '快捷记账'
       payload.remark = payload.remark || '快捷记账'
     }
-    await request.post('/api/bills', payload)
+    if (payload.id) {
+      await request.put(`/api/bills/${payload.id}`, payload)
+    } else {
+      await request.post('/api/bills', payload)
+    }
     ElMessage.success(payload.id ? '账单已更新' : '账单已新增')
     dialogVisible.value = false
     if (quickSave) {
@@ -959,7 +1038,7 @@ async function removeSelectedBills() {
   })
   loading.deleting = true
   try {
-    await Promise.all(selectedIds.value.map((id) => request.delete(`/api/bills/${id}`)))
+    await request.delete('/api/bills/batch', { data: { ids: selectedIds.value } })
     ElMessage.success('选中账单已删除')
     await loadBills()
   } finally {
@@ -1016,78 +1095,107 @@ watch(currentBookId, async (value, oldValue) => {
 }, { immediate: false })
 
 onMounted(async () => {
-  await loadBooks()
+  await Promise.all([loadBooks(true), loadCurrencyDicts()])
   await loadReferenceData()
   resetForm()
   await loadBills()
 })
 </script>
 
-<style scoped>
+<style scoped lang="stylus">
 .bill-dialog-form {
   display: grid;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .bill-dialog-intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 1rem;
   flex-wrap: wrap;
-  padding: 14px 16px;
-  border-radius: 16px;
+  padding: 0.875rem 1rem;
+  border-radius: 1rem;
   background: linear-gradient(135deg, #f7fcfb 0%, #edf7f5 100%);
-  border: 1px solid rgba(83, 181, 171, 0.16);
+  border: 0.0625rem solid rgba(83, 181, 171, 0.16);
 }
 
 .bill-dialog-intro strong,
 .bill-dialog-card-head strong {
   color: #17252e;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
 }
 
 .bill-dialog-intro span,
 .bill-dialog-card-head small {
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   display: block;
-  margin-top: 5px;
+  margin-top: 0.3125rem;
 }
 
 .bill-dialog-type-switch {
-  min-width: 200px;
+  min-width: 12.5rem;
 }
 
 .bill-dialog-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+  gap: 0.875rem;
   align-items: start;
 }
 
 .bill-dialog-card {
-  padding: 16px;
-  border-radius: 18px;
+  padding: 1rem;
+  border-radius: 1.125rem;
   background: #fbfdfd;
-  border: 1px solid rgba(64, 141, 134, 0.1);
+  border: 0.0625rem solid rgba(64, 141, 134, 0.1);
 }
 
 .bill-dialog-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
   flex-wrap: wrap;
 }
 
 .bill-dialog-fields {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 14px;
+  gap: 0.875rem;
+}
+
+.ledger-amount-field {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ledger-amount-field span {
+  min-width: 4.25rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  background: #edf8f5;
+  color: #0a645d;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.bill-dialog-amount-field :deep(.el-input-number) {
+  width: 100%;
+  min-width: 9rem;
+}
+
+.bill-dialog-amount-field :deep(.el-input-number .el-input__wrapper) {
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
 }
 
 .bill-dialog-field-span,
@@ -1096,7 +1204,8 @@ onMounted(async () => {
 }
 
 .bill-dialog-field-span,
-.bill-dialog-date-field {
+.bill-dialog-date-field,
+.bill-dialog-amount-field {
   grid-column: 1 / -1;
 }
 
@@ -1111,21 +1220,21 @@ onMounted(async () => {
 
 .bill-dialog-category-picker {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
   width: 100%;
 }
 
 .bill-dialog-category-block {
   width: 100%;
-  border-radius: 16px;
+  border-radius: 1rem;
   background: linear-gradient(180deg, #f7fbfa 0%, #edf6f4 100%);
-  padding: 14px;
+  padding: 0.875rem;
 }
 
 .bill-dialog-category-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .bill-dialog-category-grid > button,
@@ -1133,16 +1242,16 @@ onMounted(async () => {
   width: 100%;
   min-width: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: transparent;
-  min-height: 78px;
+  min-height: 4.875rem;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
+  gap: 0.5rem;
   cursor: pointer;
   color: #1d313c;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.2;
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
@@ -1154,34 +1263,34 @@ onMounted(async () => {
 .bill-dialog-subcategory-panel > button.active {
   background: #ffffff;
   color: #169980;
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .bill-dialog-category-grid span,
 .bill-dialog-subcategory-panel span {
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: #ffffff;
   color: inherit;
-  box-shadow: 0 2px 10px rgba(29, 50, 61, 0.06);
+  box-shadow: 0 0.125rem 0.625rem rgba(29, 50, 61, 0.06);
 }
 
 .bill-dialog-category-grid .el-icon,
 .bill-dialog-subcategory-panel .el-icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .bill-dialog-subcategory-panel {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
+  gap: 0.625rem;
+  padding: 0.75rem;
   align-content: start;
-  border-radius: 16px;
+  border-radius: 1rem;
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -1189,7 +1298,7 @@ onMounted(async () => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-@media (max-width: 760px) {
+@media (max-width: 47.5rem) {
   .bill-dialog-intro,
   .bill-dialog-layout {
     grid-template-columns: 1fr;

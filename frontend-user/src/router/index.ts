@@ -22,7 +22,8 @@ const routes = [
       { path: 'calendar', name: 'calendar', component: () => import('@/views/CalendarView.vue'), meta: { title: '日历视图' } },
       { path: 'messages', name: 'messages', component: () => import('@/views/MessagesView.vue'), meta: { title: '消息中心' } },
       { path: 'ocr', name: 'ocr', component: () => import('@/views/OcrView.vue'), meta: { title: 'OCR管理' } },
-      { path: 'notes', name: 'notes', component: () => import('@/views/NotesView.vue'), meta: { title: '笔记公告' } }
+      { path: 'notices', redirect: { path: '/messages', query: { type: 'notice' } } },
+      { path: 'notes', name: 'notes', component: () => import('@/views/NotesView.vue'), meta: { title: '我的笔记' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/404', meta: { public: true } }

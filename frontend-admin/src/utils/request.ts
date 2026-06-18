@@ -74,6 +74,9 @@ instance.interceptors.request.use((config) => {
 
 instance.interceptors.response.use(
   (response) => {
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
     const payload = response.data
     if (payload.code !== 200) {
       if (payload.code === 401) {
@@ -115,8 +118,14 @@ const request = {
   post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     return instance.post(normalizeApiUrl(url), data, config) as unknown as Promise<T>
   },
+  put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return instance.put(normalizeApiUrl(url), data, config) as unknown as Promise<T>
+  },
   delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return instance.delete(normalizeApiUrl(url), config) as unknown as Promise<T>
+  },
+  download(url: string, config?: AxiosRequestConfig): Promise<Blob> {
+    return instance.get(normalizeApiUrl(url), { ...config, responseType: 'blob' }) as unknown as Promise<Blob>
   }
 }
 

@@ -44,29 +44,40 @@
           </div>
         </div>
 
-        <div class="calendar-week-row">
-          <span v-for="item in weekLabels" :key="item">{{ item }}</span>
+        <div class="calendar-legend-row">
+          <span class="is-surplus">收入不低于支出</span>
+          <span class="is-deficit">支出较高</span>
+          <span class="is-empty">无记录</span>
         </div>
 
-        <div v-loading="loading" class="calendar-grid">
+        <div v-loading="loading" class="calendar-constellation">
+          <div class="calendar-month-watermark">{{ selectedMonthWatermark }}</div>
+          <svg class="calendar-spiral-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polyline :points="spiralLinePoints" />
+          </svg>
           <button
-            v-for="cell in calendarCells"
+            v-for="cell in constellationCells"
             :key="cell.date"
             type="button"
-            class="calendar-cell"
+            class="calendar-star-day"
             :class="{
-              muted: !cell.inMonth,
               today: cell.isToday,
               selected: selectedDate === cell.date,
-              active: Boolean(cell.group?.items.length)
+              active: Boolean(cell.group?.items.length),
+              'is-surplus': dayStatus(cell) === 'surplus',
+              'is-deficit': dayStatus(cell) === 'deficit',
+              'is-empty': dayStatus(cell) === 'empty'
             }"
+            :style="{ left: cell.x, top: cell.y }"
+            :aria-label="dayAriaLabel(cell)"
             @click="selectDate(cell.date)"
           >
-            <div class="calendar-date-badge">
-              <span>{{ cell.day }}</span>
-              <small>{{ cell.lunarLabel }}</small>
-            </div>
-            <em v-if="cell.group?.items.length">{{ cell.group.items.length }}笔</em>
+            <span>{{ cell.day }}</span>
+            <small v-if="cell.group?.items.length">{{ cell.group.items.length }}</small>
+            <em class="calendar-day-tooltip">
+              <b>{{ cell.day }}日</b>
+              <strong>结余: {{ formatBalanceTooltip(cell) }}</strong>
+            </em>
           </button>
         </div>
       </main>
@@ -134,7 +145,7 @@
     <el-dialog
       v-model="billDialogVisible"
       class="stats-bill-dialog"
-      width="min(420px, calc(100vw - 28px))"
+      width="min(26.25rem, calc(100vw - 1.75rem))"
       :show-close="false"
       append-to-body
     >
@@ -191,8 +202,6 @@ const categories = ref<any[]>([])
 const loading = ref(false)
 const billDialogVisible = ref(false)
 const selectedBill = ref<any>()
-const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
-
 const accountNameMap = computed(() =>
   Object.fromEntries(accounts.value.map((item) => [item.id, item.accountName]))
 )
@@ -204,6 +213,7 @@ const categoryNameMap = computed(() =>
 const monthSummary = computed(() => summarizeBills(monthlyBills.value))
 const activeDayCount = computed(() => dayGroupMap.value.size)
 const selectedMonthLabel = computed(() => `${selectedMonth.value.replace('-', '年')}月`)
+const selectedMonthWatermark = computed(() => `${Number(selectedMonth.value.split('-')[1])}月`)
 const selectedDateTitle = computed(() => `${formatDayTitle(selectedDate.value)} ${weekdayName(selectedDate.value)}`)
 const currentBookName = computed(() => books.value.find((book) => book.id === currentBookId.value)?.bookName || '当前账本')
 
@@ -259,6 +269,33 @@ const calendarCells = computed(() => {
   })
 })
 
+const constellationCells = computed(() => {
+  const [year, month] = selectedMonth.value.split('-').map(Number)
+  const totalDays = new Date(year, month, 0).getDate()
+  const today = currentDate()
+  return Array.from({ length: totalDays }, (_, index) => {
+    const day = index + 1
+    const date = `${selectedMonth.value}-${String(day).padStart(2, '0')}`
+    const position = constellationPosition(index, totalDays)
+    return {
+      date,
+      day,
+      x: `${position.x}%`,
+      y: `${position.y}%`,
+      rawX: position.x,
+      rawY: position.y,
+      inMonth: true,
+      isToday: date === today,
+      lunarLabel: lunarDayLabel(date),
+      group: dayGroupMap.value.get(date)
+    }
+  })
+})
+
+const spiralLinePoints = computed(() =>
+  constellationCells.value.map((cell) => `${cell.rawX.toFixed(2)},${cell.rawY.toFixed(2)}`).join(' ')
+)
+
 function summarizeBills(bills: any[]) {
   const income = bills
     .filter((item) => item.billType === 'INCOME')
@@ -267,6 +304,35 @@ function summarizeBills(bills: any[]) {
     .filter((item) => item.billType === 'EXPENSE')
     .reduce((sum, item) => sum + Number(item.amount || 0), 0)
   return { income, expense, balance: income - expense }
+}
+
+function constellationPosition(index: number, total: number) {
+  const progress = total <= 1 ? 1 : index / (total - 1)
+  const angle = -Math.PI * 0.65 + progress * Math.PI * 2 * 2.48
+  const radiusX = 7 + progress * 43
+  const radiusY = 6 + progress * 40
+  const x = 50 + Math.cos(angle) * radiusX
+  const y = 50 + Math.sin(angle) * radiusY
+  return {
+    x: Math.min(94, Math.max(6, x)),
+    y: Math.min(91, Math.max(9, y))
+  }
+}
+
+function dayStatus(cell: any) {
+  if (!cell.group?.items.length) return 'empty'
+  return Number(cell.group.income || 0) >= Number(cell.group.expense || 0) ? 'surplus' : 'deficit'
+}
+
+function dayAriaLabel(cell: any) {
+  const group = cell.group
+  if (!group?.items.length) return `${cell.day}日，无账单记录`
+  const status = Number(group.income || 0) >= Number(group.expense || 0) ? '收入不低于支出' : '支出大于收入'
+  return `${cell.day}日，${status}，共${group.items.length}笔账单`
+}
+
+function formatBalanceTooltip(cell: any) {
+  return formatSignedCurrency(Number(cell.group?.balance || 0))
 }
 
 function sortBills(items: any[]) {
@@ -422,29 +488,29 @@ onMounted(async () => {
 })
 </script>
 
-<style>
+<style lang="stylus">
 .calendar-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: calc(100vh - 92px);
+  gap: 0.75rem;
+  min-height: calc(100vh - 5.75rem);
 }
 
 .calendar-hero,
 .calendar-grid-card,
 .calendar-detail-card {
   background: #fff;
-  border: 1px solid #e3e9ed;
-  border-radius: 10px;
-  box-shadow: 0 10px 22px rgba(25, 38, 49, 0.045);
+  border: 0.0625rem solid #e3e9ed;
+  border-radius: 0.625rem;
+  box-shadow: 0 0.625rem 1.375rem rgba(25, 38, 49, 0.045);
 }
 
 .calendar-hero {
   display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(500px, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(16.25rem, 0.72fr) minmax(31.25rem, 1fr);
+  gap: 1.25rem;
   align-items: center;
-  padding: 16px 18px;
+  padding: 1rem 1.125rem;
 }
 
 .calendar-title-row,
@@ -460,13 +526,13 @@ onMounted(async () => {
 .calendar-grid-head,
 .calendar-detail-head {
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .calendar-grid-head {
   margin-top: 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #edf2f5;
+  padding-bottom: 0.75rem;
+  border-bottom: 0.0625rem solid #edf2f5;
 }
 
 .calendar-title-row h2,
@@ -477,7 +543,7 @@ onMounted(async () => {
 }
 
 .calendar-title-row h2 {
-  font-size: 22px;
+  font-size: 1.375rem;
 }
 
 .calendar-hero-left p,
@@ -487,32 +553,32 @@ onMounted(async () => {
 .calendar-bill-meta,
 .calendar-bill-main p {
   color: #83909d;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .calendar-month-picker {
-  width: 150px;
-  flex: 0 0 150px;
+  width: 9.375rem;
+  flex: 0 0 9.375rem;
 }
 
 .calendar-summary-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .calendar-stat {
   min-width: 0;
-  padding: 12px 12px 12px 14px;
+  padding: 0.75rem 0.75rem 0.75rem 0.875rem;
   background: #f8fafb;
-  border-radius: 8px;
+  border-radius: 0.5rem;
 }
 
 .calendar-workbench {
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(620px, 1fr) clamp(480px, 27vw, 520px);
-  gap: 12px;
+  grid-template-columns: minmax(38.75rem, 1fr) clamp(30rem, 27vw, 32.5rem);
+  gap: 0.75rem;
   flex: 1;
   min-height: 0;
   align-items: stretch;
@@ -520,9 +586,9 @@ onMounted(async () => {
 
 .calendar-grid-card,
 .calendar-detail-card {
-  height: calc(100vh - 218px);
-  min-height: 700px;
-  padding: 18px 20px;
+  height: calc(100vh - 13.625rem);
+  min-height: 43.75rem;
+  padding: 1.125rem 1.25rem;
   min-width: 0;
 }
 
@@ -537,137 +603,238 @@ onMounted(async () => {
   display: none;
 }
 
-.calendar-week-row,
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  min-width: 0;
+.calendar-legend-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.875rem 0 0.625rem;
 }
 
-.calendar-week-row {
-  margin-top: 14px;
-  color: #71808d;
-  font-weight: 800;
-  text-align: center;
-}
-
-.calendar-week-row span {
-  padding: 7px 0 8px;
-  font-size: 13px;
-}
-
-.calendar-grid {
-  flex: 1;
-  min-height: 0;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  grid-template-rows: repeat(6, minmax(72px, 1fr));
-  gap: 8px 4px;
-  align-items: stretch;
-}
-
-.calendar-cell {
+.calendar-legend-row span {
   position: relative;
-  height: auto;
-  min-height: 72px;
+  padding: 0.3125rem 0.625rem 0.3125rem 1.375rem;
+  color: #6b7480;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 62.4375rem;
+  background: #f6f8fa;
+}
+
+.calendar-legend-row span::before {
+  content: '';
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.calendar-legend-row .is-surplus::before {
+  background: #2ecf9b;
+}
+
+.calendar-legend-row .is-deficit::before {
+  background: #ff6b80;
+}
+
+.calendar-legend-row .is-empty::before {
+  background: #cfd6df;
+}
+
+.calendar-constellation {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 30rem;
+  margin: 0.25rem 0 0;
+  overflow: visible;
+  border-radius: 0.75rem;
+  background:
+    radial-gradient(circle at 34% 48%, rgba(46, 207, 155, 0.06), transparent 24%),
+    radial-gradient(circle at 70% 58%, rgba(255, 107, 128, 0.045), transparent 26%),
+    #fff;
   border: 0;
-  background: transparent;
-  padding: 0;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  box-shadow: none;
 }
 
-.calendar-cell:hover,
-.calendar-cell.active {
-  background: transparent;
+.calendar-constellation::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(240, 244, 246, 0.64), transparent 58%);
+  pointer-events: none;
 }
 
-.calendar-cell:hover .calendar-date-badge {
-  background: #f3f8f8;
+.calendar-month-watermark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(31, 42, 55, 0.05);
+  font-size: 4rem;
+  font-weight: 900;
+  pointer-events: none;
+  user-select: none;
 }
 
-.calendar-cell.selected .calendar-date-badge {
-  background: #1f8ee9;
-  color: #fff;
-  box-shadow: 0 8px 16px rgba(31, 142, 233, 0.24);
+.calendar-spiral-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
-.calendar-cell.selected .calendar-date-badge span,
-.calendar-cell.selected .calendar-date-badge small {
-  color: #fff;
+.calendar-spiral-line polyline {
+  fill: none;
+  stroke: rgba(174, 184, 194, 0.42);
+  stroke-width: 0.38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1.2 1.5;
 }
 
-.calendar-cell.today:not(.selected) .calendar-date-badge {
-  box-shadow: inset 0 0 0 1px #26a69a;
-}
-
-.calendar-cell.muted {
-  background: transparent;
-}
-
-.calendar-cell.muted .calendar-date-badge {
-  opacity: 0.45;
-}
-
-.calendar-date-badge {
-  width: 44px;
-  height: 44px;
-  margin: 8px auto 0;
+.calendar-star-day {
+  position: absolute;
+  z-index: 2;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0.0625rem solid rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: 1px;
-  transition: background 0.16s ease, box-shadow 0.16s ease;
+  padding: 0;
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
 
-.calendar-date-badge span {
-  color: #152733;
-  font-size: 15px;
-  font-weight: 500;
+.calendar-star-day span {
   line-height: 1;
+  position: relative;
+  z-index: 1;
 }
 
-.calendar-date-badge small {
-  color: #7c8792;
-  font-size: 11px;
-  line-height: 1;
-}
-
-.calendar-cell > em {
+.calendar-star-day small {
   position: absolute;
-  left: calc(50% + 25px);
-  top: 1px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: #eef4f5;
-  color: #6d7d89;
-  font-size: 11px;
-  line-height: 18px;
-  font-style: normal;
-  font-weight: 700;
-  white-space: nowrap;
+  right: -0.1875rem;
+  top: -0.25rem;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  padding: 0 0.1875rem;
+  border-radius: 62.4375rem;
+  background: #fff;
+  color: #4e5b55;
+  font-size: 0.5625rem;
+  line-height: 0.875rem;
+  box-shadow: 0 0.1875rem 0.5rem rgba(76, 61, 42, 0.14);
 }
 
-.calendar-cell.selected > em {
-  background: #e7f2ff;
-  color: #1f7fcf;
+.calendar-day-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.625rem);
+  min-width: 4.375rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #172132;
+  color: #fff;
+  box-shadow: 0 0.5rem 1rem rgba(23, 33, 50, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.25rem);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.calendar-day-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  border: 0.3125rem solid transparent;
+  border-top-color: #172132;
+  transform: translateX(-50%);
+}
+
+.calendar-day-tooltip b,
+.calendar-day-tooltip strong {
+  display: block;
+  color: #fff;
+  font-style: normal;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.calendar-day-tooltip b {
+  font-size: 0.75rem;
+}
+
+.calendar-day-tooltip strong {
+  margin-top: 0.0625rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+.calendar-star-day:hover .calendar-day-tooltip,
+.calendar-star-day:focus-visible .calendar-day-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.calendar-star-day.is-surplus {
+  background: #2ecf9b;
+  box-shadow: 0 0.375rem 0.875rem rgba(46, 207, 155, 0.24);
+}
+
+.calendar-star-day.is-deficit {
+  background: #ff6b80;
+  box-shadow: 0 0.375rem 0.875rem rgba(255, 107, 128, 0.24);
+}
+
+.calendar-star-day.is-empty {
+  background: #cfd6df;
+  color: #fff;
+  box-shadow: 0 0.3125rem 0.75rem rgba(114, 126, 139, 0.18);
+}
+
+.calendar-star-day:hover {
+  transform: translate(-50%, -50%) scale(1.14);
+  box-shadow: 0 0.5rem 1rem rgba(31, 42, 55, 0.14), 0 0 0 0.1875rem rgba(255, 255, 255, 0.86);
+}
+
+.calendar-star-day.selected {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 0.625rem 1.125rem rgba(31, 42, 55, 0.16), 0 0 0 0.1875rem rgba(255, 255, 255, 0.95), 0 0 0 0.375rem rgba(46, 207, 155, 0.24);
+}
+
+.calendar-star-day.today:not(.selected)::after {
+  content: '';
+  position: absolute;
+  inset: -0.3125rem;
+  border: 0.0625rem solid rgba(46, 207, 155, 0.58);
+  border-radius: 50%;
 }
 
 .calendar-month-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .calendar-month-actions .el-button {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .calendar-detail-card {
@@ -677,27 +844,27 @@ onMounted(async () => {
 }
 
 .calendar-detail-summary {
-  margin: 14px 0 10px;
+  margin: 0.875rem 0 0.625rem;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .calendar-detail-summary > div {
-  padding: 10px 10px 10px 12px;
-  border-radius: 8px;
+  padding: 0.625rem 0.625rem 0.625rem 0.75rem;
+  border-radius: 0.5rem;
   background: #f8fafb;
 }
 
 .calendar-detail-summary .ledger-summary-item strong {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .calendar-bill-list {
   overflow-y: auto;
   min-height: 0;
   flex: 1;
-  padding-right: 2px;
+  padding-right: 0.125rem;
   scrollbar-width: none;
 }
 
@@ -705,7 +872,7 @@ onMounted(async () => {
   flex: 1;
   display: grid;
   place-items: center;
-  min-height: 180px;
+  min-height: 11.25rem;
 }
 
 .calendar-bill-list::-webkit-scrollbar {
@@ -715,21 +882,21 @@ onMounted(async () => {
 .calendar-bill-item {
   width: 100%;
   border: 0;
-  border-bottom: 1px solid #edf2f5;
+  border-bottom: 0.0625rem solid #edf2f5;
   background: transparent;
   color: inherit;
   display: flex;
-  gap: 12px;
-  padding: 12px 0;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.16s ease, padding 0.16s ease;
 }
 
 .calendar-bill-item:hover {
-  margin: 0 -8px;
-  padding: 12px 8px;
-  border-radius: 8px;
+  margin: 0 -0.5rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 0.5rem;
   background: #f5fbf9;
 }
 
@@ -738,9 +905,9 @@ onMounted(async () => {
 }
 
 .calendar-bill-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -765,7 +932,7 @@ onMounted(async () => {
 .calendar-bill-title,
 .calendar-bill-meta {
   justify-content: space-between;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .calendar-bill-title strong,
@@ -777,7 +944,7 @@ onMounted(async () => {
 
 .calendar-bill-title strong {
   color: #10242f;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .calendar-bill-title span {
@@ -786,13 +953,13 @@ onMounted(async () => {
 }
 
 .calendar-bill-meta {
-  margin-top: 5px;
+  margin-top: 0.3125rem;
   flex-wrap: wrap;
   justify-content: flex-start;
 }
 
 .calendar-bill-main p {
-  margin: 7px 0 0;
+  margin: 0.4375rem 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -806,7 +973,7 @@ onMounted(async () => {
   color: #ff4d4f !important;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 73.75rem) {
   .calendar-hero,
   .calendar-workbench {
     grid-template-columns: 1fr;
@@ -819,7 +986,7 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 47.5rem) {
   .calendar-title-row,
   .calendar-summary-stats,
   .calendar-detail-summary {
@@ -833,12 +1000,14 @@ onMounted(async () => {
     flex-direction: column;
   }
 
-  .calendar-grid {
-    grid-template-columns: repeat(7, minmax(42px, 1fr));
+  .calendar-constellation {
+    min-height: 24rem;
   }
 
-  .calendar-week-row {
-    grid-template-columns: repeat(7, minmax(42px, 1fr));
+  .calendar-star-day {
+    width: 1.625rem;
+    height: 1.625rem;
+    font-size: 0.75rem;
   }
 }
 </style>

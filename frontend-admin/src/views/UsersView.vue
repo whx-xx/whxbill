@@ -38,7 +38,9 @@
           <span class="admin-muted">当前 {{ filteredUsers.length }} 条结果</span>
         </div>
         <div class="admin-toolbar-right">
-          <el-button :icon="Download" @click="exportUsers">导出 Excel</el-button>
+          <el-button :icon="Download" :loading="exporting" @click="exportUsers">
+            {{ exporting ? `导出中 ${exportProgress}%` : '导出 Excel' }}
+          </el-button>
           <el-button type="primary" :icon="Plus" @click="openCreate">新增用户</el-button>
         </div>
       </div>
@@ -82,7 +84,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑用户' : '新增用户'" width="640px">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑用户' : '新增用户'" width="40rem">
       <el-form :model="form" label-position="top">
         <div class="admin-form-grid">
           <el-form-item label="用户名"><el-input v-model="form.username" :disabled="Boolean(form.id)" placeholder="请输入用户名" /></el-form-item>
@@ -133,14 +135,13 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Plus, Refresh } from '@element-plus/icons-vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { apiBaseURL } from '@/utils/request'
 import request from '@/utils/request'
-import { useAuthStore } from '@/stores/auth'
 
 const users = ref<any[]>([])
 const roles = ref<any[]>([])
 const dialogVisible = ref(false)
-const authStore = useAuthStore()
+const exporting = ref(false)
+const exportProgress = ref(0)
 const filters = reactive({ keyword: '', roleId: undefined as number | undefined, status: undefined as number | undefined })
 const pagination = reactive({ page: 1, pageSize: 10 })
 const emptyForm = () => ({ id: undefined as number | undefined, username: '', nickname: '', password: '', confirmPassword: '', email: '', phone: '', avatarUrl: '', status: 1, userType: 1, roleIds: [] as number[] })
@@ -190,12 +191,13 @@ function validateUserForm() {
 }
 async function saveUser() {
   if (!validateUserForm()) return
-  await request.post('/api/admin/users', form)
+  if (form.id) await request.put(`/api/admin/users/${form.id}`, form)
+  else await request.post('/api/admin/users', form)
   ElMessage.success('用户已保存')
   dialogVisible.value = false
   await loadUsers()
 }
-async function quickSaveUser(row: any) { await request.post('/api/admin/users', { ...row, password: '', confirmPassword: '' }); ElMessage.success('状态已更新'); await loadUsers() }
+async function quickSaveUser(row: any) { await request.put(`/api/admin/users/${row.id}`, { ...row, password: '', confirmPassword: '' }); ElMessage.success('状态已更新'); await loadUsers() }
 async function removeUser(userId: number) {
   await ElMessageBox.confirm('删除后将无法恢复，是否继续？', '删除用户', { type: 'warning' })
   await request.delete(`/api/admin/users/${userId}`)
@@ -203,14 +205,26 @@ async function removeUser(userId: number) {
   await loadUsers()
 }
 async function exportUsers() {
-  const response = await fetch(`${apiBaseURL}/api/admin/users/export`, { headers: { Authorization: `Bearer ${authStore.accessToken}` } })
-  const blob = await response.blob()
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'users.xlsx'
-  link.click()
-  window.URL.revokeObjectURL(url)
+  exporting.value = true
+  exportProgress.value = 0
+  try {
+    const blob = await request.download('/api/admin/users/export', {
+      onDownloadProgress: (event) => {
+        if (event.total) {
+          exportProgress.value = Math.min(100, Math.round((event.loaded / event.total) * 100))
+        }
+      }
+    })
+    exportProgress.value = 100
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'users.xlsx'
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
 }
 
 watch(filters, () => { pagination.page = 1 })

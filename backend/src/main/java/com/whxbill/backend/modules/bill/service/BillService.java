@@ -28,5 +28,7 @@ public interface BillService {
 
     void deleteBill(Long billId);
 
+    void deleteBills(List<Long> billIds);
+
     List<BizBill> listBillsByDate(String date, Long bookId);
 }

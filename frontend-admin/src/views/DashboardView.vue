@@ -30,7 +30,7 @@
           <el-segmented v-model="chartMode" :options="['活跃', '账单']" size="small" />
         </div>
         <div class="admin-card-inner">
-          <v-chart :option="chartOption" autoresize style="height: 360px" />
+          <v-chart :option="chartOption" autoresize style="height: 22.5rem" />
         </div>
       </div>
 
@@ -47,7 +47,7 @@
               <strong>{{ todo.title }}</strong>
               <el-tag size="small" :type="todo.type">{{ todo.badge }}</el-tag>
             </div>
-            <p class="admin-muted" style="margin: 8px 0 0">{{ todo.desc }}</p>
+            <p class="admin-muted" style="margin: 0.5rem 0 0">{{ todo.desc }}</p>
           </button>
         </div>
       </div>

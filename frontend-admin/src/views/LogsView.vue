@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <el-drawer v-model="detailVisible" title="日志详情" size="420px">
+    <el-drawer v-model="detailVisible" title="日志详情" size="26.25rem">
       <el-descriptions v-if="currentLog" :column="1" border>
         <el-descriptions-item label="操作人">{{ currentLog.operatorName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="模块">{{ currentLog.moduleName || '-' }}</el-descriptions-item>

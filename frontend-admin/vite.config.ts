@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
   const appBase = env.VITE_APP_BASE || '/admin/'
 
   return {
-    base: '/',
+    base: appBase,
     plugins: [vue()],
     resolve: {
       alias: {
@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     server: {
-      port: 5174,
+      port: 5173,
       proxy: {
         '/api': {
           target: env.VITE_DEV_API_TARGET || 'http://localhost:8080',

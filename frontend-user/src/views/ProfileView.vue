@@ -179,27 +179,27 @@ function syncAvatarPreview() {
 onMounted(loadProfile)
 </script>
 
-<style scoped>
+<style scoped lang="stylus">
 .profile-shell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .profile-head,
 .profile-card,
 .profile-form-card {
   background: #fff;
-  border: 1px solid #e5ebf0;
-  border-radius: 8px;
+  border: 0.0625rem solid #e5ebf0;
+  border-radius: 0.5rem;
 }
 
 .profile-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 1rem;
+  padding: 1.25rem;
 }
 
 .profile-head h2,
@@ -210,35 +210,35 @@ onMounted(loadProfile)
 }
 
 .profile-head h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 .profile-head p,
 .profile-section-head span,
 .profile-card p {
   color: #7d8d9a;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .profile-head p {
-  margin: 8px 0 0;
+  margin: 0.5rem 0 0;
 }
 
 .profile-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 18.75rem minmax(0, 1fr);
+  gap: 0.875rem;
   align-items: start;
 }
 
 .profile-card {
-  padding: 20px;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
   position: sticky;
-  top: 82px;
+  top: 5.125rem;
 }
 
 .profile-avatar-wrap {
@@ -247,55 +247,55 @@ onMounted(loadProfile)
 
 .profile-status-dot {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #fff;
+  right: 0.625rem;
+  bottom: 0.625rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 0.125rem solid #fff;
   border-radius: 50%;
   background: #22b573;
 }
 
 .profile-card p {
-  margin: -4px 0 0;
+  margin: -0.25rem 0 0;
 }
 
 .profile-role-list {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
   width: 100%;
 }
 
 .profile-form-card {
-  padding: 18px 20px 20px;
+  padding: 1.125rem 1.25rem 1.25rem;
 }
 
 .profile-section-head {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .profile-section-head h3 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .profile-section-head span {
   display: inline-block;
-  margin-top: 6px;
+  margin-top: 0.375rem;
 }
 
 .profile-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 14px;
+  gap: 0 0.875rem;
 }
 
 .profile-full-row {
   grid-column: 1 / -1;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 60rem) {
   .profile-layout {
     grid-template-columns: 1fr;
   }
@@ -305,7 +305,7 @@ onMounted(loadProfile)
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 45rem) {
   .profile-head {
     align-items: stretch;
     flex-direction: column;

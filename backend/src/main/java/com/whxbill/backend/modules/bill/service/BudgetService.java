@@ -11,4 +11,6 @@ public interface BudgetService {
     BizBudget saveBudget(BudgetSaveRequest request);
 
     void deleteBudget(Long budgetId);
+
+    void deleteBudgets(List<Long> budgetIds);
 }

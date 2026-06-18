@@ -86,6 +86,12 @@ public class BudgetServiceImpl implements BudgetService {
         bizBudgetMapper.deleteById(budgetId);
     }
 
+    @Override
+    public void deleteBudgets(List<Long> budgetIds) {
+        // 逐条删除可继续复用账本归属校验，避免跨用户删除预算。
+        budgetIds.forEach(this::deleteBudget);
+    }
+
     private BigDecimal calculateUsedAmount(Long bookId, Long categoryId, String budgetMonth) {
         List<BizBill> bills = bizBillMapper.selectList(new LambdaQueryWrapper<BizBill>()
             .eq(BizBill::getUserId, SecurityUtils.getUserId())

@@ -16,11 +16,13 @@ import com.whxbill.backend.security.SecurityUtils;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +38,7 @@ public class BookController {
     private final BizBudgetMapper bizBudgetMapper;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('bill:list')")
     public ApiResponse<List<BizBook>> list() {
         return ApiResponse.success(bizBookMapper.selectList(new LambdaQueryWrapper<BizBook>()
             .eq(BizBook::getUserId, SecurityUtils.getUserId())
@@ -45,6 +48,7 @@ public class BookController {
 
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('bill:create')")
     public ApiResponse<BizBook> save(@Valid @RequestBody BookSaveRequest request) {
         Long userId = SecurityUtils.getUserId();
         BizBook book = request.getId() == null ? new BizBook() : bizBookMapper.selectOne(
@@ -53,6 +57,20 @@ public class BookController {
                 .eq(BizBook::getUserId, userId));
         if (book == null) {
             throw new BusinessException("账本不存在");
+        }
+        String nextCurrencyCode = request.getCurrencyCode() == null || request.getCurrencyCode().isBlank()
+            ? "CNY"
+            : request.getCurrencyCode();
+        if (request.getId() != null) {
+            Long billCount = bizBillMapper.selectCount(new LambdaQueryWrapper<BizBill>()
+                .eq(BizBill::getUserId, userId)
+                .eq(BizBill::getBookId, request.getId()));
+            String currentCurrencyCode = book.getCurrencyCode() == null || book.getCurrencyCode().isBlank()
+                ? "CNY"
+                : book.getCurrencyCode();
+            if (billCount != null && billCount > 0 && !currentCurrencyCode.equals(nextCurrencyCode)) {
+                throw new BusinessException("账本下已有账单，不能修改币种");
+            }
         }
         if (Integer.valueOf(1).equals(request.getIsDefault())) {
             List<BizBook> books = bizBookMapper.selectList(new LambdaQueryWrapper<BizBook>()
@@ -64,7 +82,7 @@ public class BookController {
         }
         book.setUserId(userId);
         book.setBookName(request.getBookName());
-        book.setCurrencyCode(request.getCurrencyCode() == null || request.getCurrencyCode().isBlank() ? "CNY" : request.getCurrencyCode());
+        book.setCurrencyCode(nextCurrencyCode);
         book.setIsDefault(request.getIsDefault() == null ? 0 : request.getIsDefault());
         if (request.getId() == null) {
             bizBookMapper.insert(book);
@@ -74,7 +92,16 @@ public class BookController {
         return ApiResponse.success(book);
     }
 
+    @PutMapping("/{bookId}")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('bill:create')")
+    public ApiResponse<BizBook> update(@PathVariable Long bookId, @Valid @RequestBody BookSaveRequest request) {
+        request.setId(bookId);
+        return save(request);
+    }
+
     @DeleteMapping("/{bookId}")
+    @PreAuthorize("hasAuthority('bill:create')")
     public ApiResponse<Void> delete(@PathVariable Long bookId) {
         Long userId = SecurityUtils.getUserId();
         BizBook book = bizBookMapper.selectOne(new LambdaQueryWrapper<BizBook>()

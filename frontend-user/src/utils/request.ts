@@ -120,6 +120,9 @@ const request = {
   post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     return instance.post(normalizeApiUrl(url), data, config) as unknown as Promise<T>
   },
+  put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return instance.put(normalizeApiUrl(url), data, config) as unknown as Promise<T>
+  },
   delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return instance.delete(normalizeApiUrl(url), config) as unknown as Promise<T>
   },

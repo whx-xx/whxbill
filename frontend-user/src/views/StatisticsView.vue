@@ -72,7 +72,7 @@
             <span class="expense">支出</span>
           </div>
         </div>
-        <v-chart :option="trendOption" autoresize style="height:180px" />
+        <v-chart :option="trendOption" autoresize style="height:11.25rem" />
       </section>
 
       <section class="stats-grid">
@@ -126,7 +126,7 @@
       </div>
     </aside>
 
-    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="min(420px, 100vw)">
+    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="min(26.25rem, 100vw)">
       <div class="stats-drawer-list" v-loading="detailLoading">
         <button
           v-for="bill in detailBills.records"
@@ -164,7 +164,7 @@
     <el-dialog
       v-model="billDialogVisible"
       class="stats-bill-dialog"
-      width="min(420px, calc(100vw - 28px))"
+      width="min(26.25rem, calc(100vw - 1.75rem))"
       :show-close="false"
       append-to-body
     >
@@ -621,7 +621,7 @@ const CategoryStatCard = defineComponent({
       props.rows.length
         ? h('div', { class: 'stats-chart-row' }, [
           h('div', { class: 'stats-pie-wrap' }, [
-            h(VChart, { option: props.option, autoresize: true, style: 'height:220px' })
+            h(VChart, { option: props.option, autoresize: true, style: 'height:13.75rem' })
           ]),
           h('div', { class: 'stats-rank-list' }, props.rows.map((item: any) =>
             h('button', { class: 'stats-rank-item', onClick: () => emit('open', item, props.type) }, [

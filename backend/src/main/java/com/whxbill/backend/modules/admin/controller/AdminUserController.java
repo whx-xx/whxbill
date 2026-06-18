@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -122,6 +123,14 @@ public class AdminUserController {
             });
         }
         return ApiResponse.success(buildUserVo(user));
+    }
+
+    @PutMapping("/{userId}")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('admin:user:update')")
+    public ApiResponse<AdminUserVo> update(@PathVariable Long userId, @Valid @RequestBody AdminUserSaveRequest request) {
+        request.setId(userId);
+        return save(request);
     }
 
     @DeleteMapping("/{userId}")

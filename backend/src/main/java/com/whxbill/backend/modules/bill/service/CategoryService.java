@@ -11,4 +11,6 @@ public interface CategoryService {
     BizCategory saveCategory(CategorySaveRequest request);
 
     void deleteCategory(Long categoryId);
+
+    void deleteCategories(List<Long> categoryIds);
 }

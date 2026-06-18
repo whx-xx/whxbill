@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑角色' : '新增角色'" width="760px">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑角色' : '新增角色'" width="47.5rem">
       <el-form :model="form" label-position="top">
         <div class="admin-form-grid">
           <el-form-item label="角色编码"><el-input v-model="form.roleCode" placeholder="例如 ROLE_ADMIN" /></el-form-item>
@@ -76,7 +76,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="权限分配">
-          <el-tree ref="permissionTreeRef" node-key="id" show-checkbox default-expand-all style="width: 100%; border: 1px solid #e6ecef; border-radius: 8px; padding: 12px" :data="permissionTree" :props="{ label: 'label', children: 'children' }" />
+          <el-tree ref="permissionTreeRef" node-key="id" show-checkbox default-expand-all style="width: 100%; border: 0.0625rem solid #e6ecef; border-radius: 0.5rem; padding: 0.75rem" :data="permissionTree" :props="{ label: 'label', children: 'children' }" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -143,12 +143,13 @@ function openEdit(row: any) {
 }
 async function saveRole() {
   const checkedKeys = (permissionTreeRef.value?.getCheckedKeys(false) || []) as number[]
-  await request.post('/api/admin/roles', { ...form, permissionIds: checkedKeys })
+  if (form.id) await request.put(`/api/admin/roles/${form.id}`, { ...form, permissionIds: checkedKeys })
+  else await request.post('/api/admin/roles', { ...form, permissionIds: checkedKeys })
   ElMessage.success('角色已保存')
   dialogVisible.value = false
   await loadData()
 }
-async function quickSaveRole(row: any) { await request.post('/api/admin/roles', { ...row, permissionIds: rolePermissions.value.find((item: any) => item.roleId === row.id)?.permissions?.map((item: any) => item.id) || [] }); ElMessage.success('状态已更新'); await loadData() }
+async function quickSaveRole(row: any) { await request.put(`/api/admin/roles/${row.id}`, { ...row, permissionIds: rolePermissions.value.find((item: any) => item.roleId === row.id)?.permissions?.map((item: any) => item.id) || [] }); ElMessage.success('状态已更新'); await loadData() }
 async function removeRole(roleId: number) {
   await ElMessageBox.confirm('删除角色后将移除其权限关联，是否继续？', '删除角色', { type: 'warning' })
   await request.delete(`/api/admin/roles/${roleId}`)

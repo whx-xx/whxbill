@@ -13,6 +13,7 @@ public class SysDict extends BaseEntity {
     private String dictType;
     private String dictLabel;
     private String dictValue;
+    private String dictExtra;
     private Integer sortOrder;
     private Integer status;
 }

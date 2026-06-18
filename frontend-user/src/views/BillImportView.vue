@@ -407,10 +407,10 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="stylus">
 .import-shell {
   display: grid;
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .import-toolbar,
@@ -426,68 +426,68 @@ onMounted(async () => {
 
 .import-toolbar {
   justify-content: space-between;
-  gap: 14px;
+  gap: 0.875rem;
   background: #effaf7;
-  border: 1px solid #d9eee8;
-  border-radius: 14px;
-  padding: 16px 18px;
+  border: 0.0625rem solid #d9eee8;
+  border-radius: 0.875rem;
+  padding: 1rem 1.125rem;
 }
 
 .import-file-card {
-  gap: 12px;
+  gap: 0.75rem;
   min-width: 0;
 }
 
 .import-file-card > .el-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 0.75rem;
   display: grid;
   place-items: center;
   background: #28aa91;
   color: #fff;
-  font-size: 22px;
+  font-size: 1.375rem;
   flex: 0 0 auto;
 }
 
 .import-file-card h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   color: #17252e;
 }
 
 .import-file-card p {
-  margin: 6px 0 0;
+  margin: 0.375rem 0 0;
   color: #7b8c96;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .import-toolbar-right {
-  gap: 10px;
+  gap: 0.625rem;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .import-book-select {
-  width: 160px;
+  width: 10rem;
 }
 
 .import-empty {
-  padding: 42px;
+  padding: 2.625rem;
 }
 
 .import-workbench {
   align-items: stretch;
   display: grid;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1fr) 360px;
-  gap: 14px;
-  min-height: calc(100vh - 210px);
+  grid-template-columns: minmax(22.5rem, 0.9fr) minmax(26.25rem, 1fr) 22.5rem;
+  gap: 0.875rem;
+  min-height: calc(100vh - 13.125rem);
 }
 
 .import-raw-panel,
 .import-result-panel,
 .import-detail-panel {
-  padding: 16px;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -495,21 +495,21 @@ onMounted(async () => {
 
 .import-panel-head {
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #edf1f4;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 0.0625rem solid #edf1f4;
 }
 
 .import-panel-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: #17252e;
 }
 
 .import-stat-strip {
-  gap: 10px;
+  gap: 0.625rem;
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .import-stat-strip strong {
@@ -534,7 +534,7 @@ onMounted(async () => {
   min-height: 0;
   overflow: auto;
   scrollbar-width: none;
-  padding-top: 10px;
+  padding-top: 0.625rem;
 }
 
 .import-raw-list::-webkit-scrollbar,
@@ -553,11 +553,11 @@ onMounted(async () => {
 
 .import-raw-row {
   display: grid;
-  grid-template-columns: 28px 28px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 1.75rem 1.75rem minmax(0, 1fr);
+  gap: 0.5rem;
   align-items: center;
-  padding: 10px 8px;
-  border-radius: 10px;
+  padding: 0.625rem 0.5rem;
+  border-radius: 0.625rem;
 }
 
 .import-raw-row.active,
@@ -571,41 +571,41 @@ onMounted(async () => {
 }
 
 .import-raw-row > span {
-  height: 24px;
-  border-radius: 8px;
+  height: 1.5rem;
+  border-radius: 0.5rem;
   display: grid;
   place-items: center;
   background: #edf1f4;
   color: #7b8c96;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .import-raw-row p {
   margin: 0;
   color: #526776;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.7;
 }
 
 .import-bill-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 2.625rem minmax(0, 1fr) auto;
+  gap: 0.75rem;
   align-items: center;
-  padding: 12px 10px;
-  border-radius: 12px;
+  padding: 0.75rem 0.625rem;
+  border-radius: 0.75rem;
 }
 
 .import-bill-icon {
-  width: 38px;
-  height: 38px;
+  width: 2.375rem;
+  height: 2.375rem;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: #f3f6f8;
   color: #17252e;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .import-bill-copy {
@@ -623,9 +623,9 @@ onMounted(async () => {
 .import-bill-copy small,
 .import-detail-hero span {
   display: block;
-  margin-top: 4px;
+  margin-top: 0.25rem;
   color: #8c99a8;
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -647,9 +647,9 @@ onMounted(async () => {
 }
 
 .import-detail-hero {
-  gap: 12px;
-  padding: 18px;
-  border-radius: 14px;
+  gap: 0.75rem;
+  padding: 1.125rem;
+  border-radius: 0.875rem;
   background: #31a88f;
   color: #fff;
 }
@@ -659,11 +659,11 @@ onMounted(async () => {
 }
 
 .import-detail-hero > .el-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.2);
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 .import-detail-hero strong,
@@ -674,38 +674,38 @@ onMounted(async () => {
 
 .import-detail-hero em {
   margin-left: auto;
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 .import-detail-form {
-  padding-top: 14px;
+  padding-top: 0.875rem;
 }
 
 .import-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .import-original-card {
   margin-top: auto;
   background: #f7f9fb;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.875rem;
 }
 
 .import-original-head,
 .import-original-card > div {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .import-original-card > div {
-  padding: 7px 0;
-  border-bottom: 1px solid #edf1f4;
+  padding: 0.4375rem 0;
+  border-bottom: 0.0625rem solid #edf1f4;
   color: #7b8c96;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .import-original-card > div:last-child {
@@ -718,7 +718,7 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 87.5rem) {
   .import-workbench {
     grid-template-columns: 1fr 1fr;
   }

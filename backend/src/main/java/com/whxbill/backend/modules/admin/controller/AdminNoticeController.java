@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,6 +35,14 @@ public class AdminNoticeController {
     @PreAuthorize("hasAuthority('admin:notice:create') or hasAuthority('admin:notice:update')")
     @OperationLog(module = "公告", type = "SAVE", value = "保存公告")
     public ApiResponse<SysNotice> save(@Valid @RequestBody NoticeSaveRequest request) {
+        return ApiResponse.success(noticeService.saveNotice(request));
+    }
+
+    @PutMapping("/{noticeId}")
+    @PreAuthorize("hasAuthority('admin:notice:update')")
+    @OperationLog(module = "公告", type = "UPDATE", value = "修改公告")
+    public ApiResponse<SysNotice> update(@PathVariable Long noticeId, @Valid @RequestBody NoticeSaveRequest request) {
+        request.setId(noticeId);
         return ApiResponse.success(noticeService.saveNotice(request));
     }
 

@@ -18,6 +18,8 @@ public class AdminDictSaveRequest {
     @NotBlank(message = "字典值不能为空")
     private String dictValue;
 
+    private String dictExtra;
+
     @NotNull(message = "排序不能为空")
     private Integer sortOrder;
 

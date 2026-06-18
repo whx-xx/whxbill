@@ -219,6 +219,10 @@ const textLineCount = computed(() => recognizedText.value.split(/\r?\n/).filter(
 const categoriesByType = computed(() => categories.value.filter((item) => item.categoryType === billForm.billType))
 const displayBillTime = computed(() => billForm.billTime ? billForm.billTime.replace('T', ' ') : '-')
 
+function toBackendDateTime(value?: string) {
+  return value ? value.replace(' ', 'T').slice(0, 19) : ''
+}
+
 async function onFileChange(file: UploadFile) {
   if (!file.raw || recognizing.value) return
   if (!file.raw.type.startsWith('image/')) {
@@ -312,6 +316,7 @@ async function saveOcrBill() {
     const payload = {
       ...billForm,
       billDate: billForm.billTime.slice(0, 10),
+      billTime: toBackendDateTime(billForm.billTime),
       sourceType: 'OCR'
     }
     await request.post('/api/bills', payload)
@@ -568,11 +573,11 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="stylus">
 .ocr-shell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .ocr-head,
@@ -580,16 +585,16 @@ onMounted(async () => {
 .ocr-text-panel,
 .ocr-confirm-panel {
   background: #fff;
-  border: 1px solid #e5ebf0;
-  border-radius: 8px;
+  border: 0.0625rem solid #e5ebf0;
+  border-radius: 0.5rem;
 }
 
 .ocr-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 1rem;
+  padding: 1.25rem;
 }
 
 .ocr-head h2,
@@ -600,7 +605,7 @@ onMounted(async () => {
 }
 
 .ocr-head h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 .ocr-head p,
@@ -610,11 +615,11 @@ onMounted(async () => {
 .ocr-confirm-hero span,
 .ocr-confirm-hero small {
   color: #7d8d9a;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .ocr-head p {
-  margin: 8px 0 0;
+  margin: 0.5rem 0 0;
 }
 
 .ocr-head-actions,
@@ -622,73 +627,73 @@ onMounted(async () => {
 .ocr-mini-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .ocr-workbench {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 22.5rem minmax(0, 1fr);
+  gap: 0.875rem;
   align-items: start;
 }
 
 .ocr-shell.has-draft .ocr-workbench {
-  grid-template-columns: 330px minmax(420px, 0.86fr) minmax(430px, 1fr);
+  grid-template-columns: 20.625rem minmax(26.25rem, 0.86fr) minmax(26.875rem, 1fr);
 }
 
 .ocr-source-panel,
 .ocr-text-panel,
 .ocr-confirm-panel {
-  padding: 16px;
+  padding: 1rem;
   min-width: 0;
 }
 
 .ocr-source-panel,
 .ocr-confirm-panel {
   position: sticky;
-  top: 82px;
+  top: 5.125rem;
 }
 
 .ocr-source-panel :deep(.el-upload-dragger) {
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: #fbfcfd;
 }
 
 .ocr-upload-icon {
   color: #26a69a;
-  font-size: 42px;
+  font-size: 2.625rem;
 }
 
 .ocr-upload-title {
-  margin-top: 8px;
+  margin-top: 0.5rem;
   color: #10242f;
   font-weight: 700;
 }
 
 .ocr-upload-tip {
-  margin-top: 6px;
+  margin-top: 0.375rem;
   color: #7d8d9a;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .ocr-preview-card {
-  margin-top: 14px;
-  border: 1px solid #edf1f4;
-  border-radius: 8px;
+  margin-top: 0.875rem;
+  border: 0.0625rem solid #edf1f4;
+  border-radius: 0.5rem;
   overflow: hidden;
   background: #f8fafb;
 }
 
 .ocr-preview-card .ocr-mini-head {
   justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid #edf1f4;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 0.0625rem solid #edf1f4;
 }
 
 .ocr-preview-card img {
   display: block;
   width: 100%;
-  max-height: 280px;
+  max-height: 17.5rem;
   object-fit: contain;
 }
 
@@ -697,16 +702,16 @@ onMounted(async () => {
 .ocr-bill-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 0.625rem;
+  margin-top: 0.875rem;
 }
 
 .ocr-status-grid > div,
 .ocr-evidence-grid > div {
   display: grid;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 8px;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
   background: #f8fafb;
   min-width: 0;
 }
@@ -714,7 +719,7 @@ onMounted(async () => {
 .ocr-status-grid strong,
 .ocr-evidence-grid strong {
   color: #10242f;
-  font-size: 15px;
+  font-size: 0.9375rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -722,11 +727,11 @@ onMounted(async () => {
 
 .ocr-panel-head {
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
 
 .ocr-text-panel :deep(.el-textarea__inner) {
-  min-height: 390px !important;
+  min-height: 24.375rem !important;
   font-family: "Consolas", "Microsoft YaHei", monospace;
   line-height: 1.65;
 }
@@ -734,18 +739,18 @@ onMounted(async () => {
 .ocr-confirm-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0.875rem;
 }
 
 .ocr-confirm-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 8px;
+  gap: 0.875rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
   background: #fff7f7;
-  border: 1px solid #ffe1e1;
+  border: 0.0625rem solid #ffe1e1;
 }
 
 .ocr-confirm-hero.income {
@@ -755,13 +760,13 @@ onMounted(async () => {
 
 .ocr-confirm-hero > div {
   display: grid;
-  gap: 6px;
+  gap: 0.375rem;
   min-width: 0;
 }
 
 .ocr-confirm-hero strong {
   color: #ff474d;
-  font-size: 28px;
+  font-size: 1.75rem;
   line-height: 1;
 }
 
@@ -780,17 +785,17 @@ onMounted(async () => {
 }
 
 .ocr-evidence-card {
-  padding-top: 12px;
-  border-top: 1px solid #edf1f4;
+  padding-top: 0.75rem;
+  border-top: 0.0625rem solid #edf1f4;
 }
 
 .ocr-tips {
-  margin-top: 12px;
+  margin-top: 0.75rem;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 85rem) {
   .ocr-shell.has-draft .ocr-workbench {
-    grid-template-columns: 310px minmax(0, 1fr);
+    grid-template-columns: 19.375rem minmax(0, 1fr);
   }
 
   .ocr-confirm-panel {
@@ -799,7 +804,7 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 60rem) {
   .ocr-workbench,
   .ocr-shell.has-draft .ocr-workbench {
     grid-template-columns: 1fr;
@@ -810,7 +815,7 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 45rem) {
   .ocr-head,
   .ocr-head-actions,
   .ocr-confirm-hero {

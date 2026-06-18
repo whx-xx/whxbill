@@ -136,4 +136,10 @@ public class CategoryServiceImpl implements CategoryService {
         }
         bizCategoryMapper.deleteById(categoryId);
     }
+
+    @Override
+    public void deleteCategories(List<Long> categoryIds) {
+        // 复用单条删除校验，保证子分类和账单引用约束不会被批量接口绕过。
+        categoryIds.forEach(this::deleteCategory);
+    }
 }

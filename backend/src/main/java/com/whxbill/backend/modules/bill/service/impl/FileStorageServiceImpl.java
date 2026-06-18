@@ -9,6 +9,8 @@ import com.aliyun.oss.model.OSSObject;
 import com.aliyun.oss.model.PutObjectRequest;
 import com.whxbill.backend.common.exception.BusinessException;
 import com.whxbill.backend.config.properties.OssProperties;
+import com.whxbill.backend.modules.bill.entity.BizAttachment;
+import com.whxbill.backend.modules.bill.mapper.BizAttachmentMapper;
 import com.whxbill.backend.modules.bill.service.FileStorageService;
 import com.whxbill.backend.security.SecurityUtils;
 import java.io.IOException;
@@ -33,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileStorageServiceImpl implements FileStorageService {
 
     private static final long MAX_FILE_SIZE = 20L * 1024 * 1024;
+    private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final String[] ALLOWED_CONTENT_TYPES = {
         "image/jpeg", "image/png", "image/webp", "image/gif",
         "application/pdf", "text/plain",
@@ -43,12 +46,14 @@ public class FileStorageServiceImpl implements FileStorageService {
     };
 
     private final OssProperties ossProperties;
+    private final BizAttachmentMapper bizAttachmentMapper;
 
     @Override
-    public Map<String, Object> upload(MultipartFile file) {
+    public Map<String, Object> upload(MultipartFile file, Long billId) {
         validateUpload(file);
         String safeFileName = sanitizeFileName(file.getOriginalFilename());
         String objectKey = userUploadPrefix() + LocalDate.now() + "/" + UUID.randomUUID() + "-" + safeFileName;
+        String fileUrl = ossProperties.getPublicHost() + "/" + objectKey;
         OSS ossClient = new OSSClientBuilder().build(
             normalizeEndpoint(ossProperties.getEndpoint()),
             ossProperties.getAccessKeyId(),
@@ -65,9 +70,23 @@ public class FileStorageServiceImpl implements FileStorageService {
         } finally {
             ossClient.shutdown();
         }
+        // OSS 上传成功后同步落库，满足附件可审计、可关联账单的业务要求。
+        BizAttachment attachment = new BizAttachment();
+        attachment.setUserId(SecurityUtils.getUserId());
+        attachment.setBillId(billId);
+        attachment.setFileName(file.getOriginalFilename());
+        attachment.setFileUrl(fileUrl);
+        attachment.setContentType(resolveContentType(file));
+        attachment.setFileSize(file.getSize());
+        bizAttachmentMapper.insert(attachment);
+
         Map<String, Object> result = new HashMap<>();
+        result.put("id", attachment.getId());
+        result.put("attachmentId", attachment.getId());
         result.put("fileName", file.getOriginalFilename());
-        result.put("fileUrl", ossProperties.getPublicHost() + "/" + objectKey);
+        result.put("fileUrl", fileUrl);
+        result.put("contentType", attachment.getContentType());
+        result.put("fileSize", attachment.getFileSize());
         return result;
     }
 
@@ -173,6 +192,10 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BusinessException("文件名不合法");
         }
         String contentType = resolveContentType(file).toLowerCase(Locale.ROOT);
+        // 图片按课程要求收紧到 5MB，其余受通用 20MB 上限约束。
+        if (contentType.startsWith("image/") && file.getSize() > MAX_IMAGE_SIZE) {
+            throw new BusinessException("图片文件不能超过 5MB");
+        }
         boolean allowed = Arrays.asList(ALLOWED_CONTENT_TYPES).contains(contentType);
         if (!allowed) {
             throw new BusinessException("不支持的文件类型");

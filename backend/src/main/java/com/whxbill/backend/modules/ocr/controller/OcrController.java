@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,7 @@ public class OcrController {
     private static final Pattern ORDER_NO = Pattern.compile("[A-Z0-9]{12,}");
 
     @PostMapping("/draft")
+    @PreAuthorize("hasAuthority('bill:create')")
     public ApiResponse<Map<String, Object>> draft(@RequestBody Map<String, String> payload) {
         String rawText = payload.getOrDefault("text", "");
         List<String> lines = normalizeLines(rawText);

@@ -54,7 +54,6 @@
           >
             批量删除
           </el-button>
-          <el-button :icon="Plus" type="primary" @click="openCreateDialog">新增账户</el-button>
         </div>
       </div>
     </section>
@@ -163,7 +162,7 @@
       v-model="dialogVisible"
       class="account-dialog"
       :title="form.id ? '编辑账户' : '新增账户'"
-      width="min(640px, calc(100vw - 24px))"
+      width="min(40rem, calc(100vw - 1.5rem))"
       destroy-on-close
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -431,10 +430,15 @@ async function saveAccount() {
 
   loading.saving = true
   try {
-    await request.post('/api/accounts', {
+    const payload = {
       ...form,
       accountName: form.accountName.trim()
-    })
+    }
+    if (form.id) {
+      await request.put(`/api/accounts/${form.id}`, payload)
+    } else {
+      await request.post('/api/accounts', payload)
+    }
     ElMessage.success(form.id ? '账户已更新' : '账户已新增')
     dialogVisible.value = false
     await loadAccounts()
@@ -463,7 +467,7 @@ async function removeSelectedAccounts() {
   })
   loading.deleting = true
   try {
-    await Promise.all(selectedIds.value.map((id) => request.delete(`/api/accounts/${id}`)))
+    await request.delete('/api/accounts/batch', { data: { ids: selectedIds.value } })
     ElMessage.success('选中账户已删除')
     await loadAccounts()
   } finally {
@@ -501,288 +505,287 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-.account-manage-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+<style scoped lang="stylus">
+.account-manage-shell
+  display flex
+  flex-direction column
+  gap 1rem
 
 .account-page-head,
 .account-control-card,
 .account-type-panel,
 .account-table-panel,
-.account-stat-card {
-  background: #fff;
-  border: 1px solid #e5ebf0;
-  border-radius: 8px;
-}
+.account-stat-card
+  background #fff
+  border 0.0625rem solid rgba(64, 141, 134, 0.1)
+  border-radius 0.5rem
+  box-shadow 0 0.625rem 1.5rem rgba(29, 50, 61, 0.045)
 
-.account-page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-}
+.account-page-head
+  display flex
+  justify-content space-between
+  align-items center
+  gap 1rem
+  padding 1.125rem 1.25rem
+  background linear-gradient(135deg, #ffffff 0%, #f1fbf8 55%, #eef5ff 100%)
 
 .account-page-head h2,
-.account-panel-head h3 {
-  margin: 0;
-  color: #10242f;
-}
+.account-panel-head h3
+  margin 0
+  color #132933
 
-.account-page-head h2 {
-  font-size: 24px;
-}
+.account-page-head h2
+  font-size 1.625rem
+  font-weight 900
 
 .account-page-head p,
 .account-panel-head span,
 .account-stat-card span,
 .account-stat-card small,
 .account-name-cell small,
-.account-type-main small {
-  color: #7d8d9a;
-  font-size: 13px;
-}
+.account-type-main small
+  color #728692
+  font-size 0.8125rem
 
-.account-page-head p {
-  margin: 8px 0 0;
-}
+.account-page-head p
+  margin 0.5rem 0 0
+  max-width 42rem
+  line-height 1.65
 
-.account-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
+.manage-section-eyebrow
+  display inline-flex
+  align-items center
+  min-height 1.5rem
+  padding 0 0.625rem
+  border-radius 62.4375rem
+  background #e9f8f5
+  color #168a78
+  font-weight 800
 
-.account-stat-card {
-  min-height: 96px;
-  padding: 16px;
-  border-left: 4px solid #d8e4ea;
-  display: grid;
-  align-content: center;
-  gap: 6px;
-}
+.account-stat-grid
+  display grid
+  grid-template-columns repeat(4, minmax(0, 1fr))
+  gap 0.75rem
 
-.account-stat-card strong {
-  font-size: 25px;
-  line-height: 1;
-  color: #10242f;
-}
+.account-stat-card
+  min-height 6.25rem
+  padding 1rem
+  display grid
+  align-content center
+  gap 0.375rem
+  position relative
+  overflow hidden
 
-.account-stat-card.balance {
-  border-left-color: #1fa77a;
-}
+.account-stat-card::after
+  content ''
+  position absolute
+  left 1rem
+  right 1rem
+  bottom 0
+  height 0.1875rem
+  border-radius 62.4375rem
+  background #d8e4ea
 
-.account-stat-card.selected {
-  border-left-color: #238be6;
-}
+.account-stat-card.balance::after
+  background linear-gradient(90deg, #26a69a, #43c66a)
 
-.account-control-card {
-  padding: 14px 16px;
-}
+.account-stat-card.selected::after
+  background linear-gradient(90deg, #4f8ef7, #26a69a)
+
+.account-stat-card strong
+  font-size 1.5625rem
+  line-height 1.05
+  color #132933
+  font-weight 900
+  font-variant-numeric tabular-nums
+
+.account-control-card
+  padding 1rem
 
 .account-filter-row,
 .account-control-actions,
 .account-panel-head,
 .account-type-card,
 .account-name-cell,
-.account-color-field {
-  display: flex;
-  align-items: center;
-}
+.account-color-field
+  display flex
+  align-items center
 
-.account-filter-row {
-  gap: 12px;
-  flex-wrap: wrap;
-}
+.account-filter-row
+  gap 0.75rem
+  flex-wrap wrap
 
-.account-search {
-  width: min(360px, 100%);
-}
+.account-search
+  width min(22.5rem, 100%)
 
-.account-control-actions {
-  gap: 10px;
-  margin-left: auto;
-}
+.account-control-actions
+  gap 0.625rem
+  margin-left auto
 
-.account-workbench {
-  display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
+.account-workbench
+  display grid
+  grid-template-columns 21rem minmax(0, 1fr)
+  gap 1rem
+  align-items start
 
 .account-type-panel,
-.account-table-panel {
-  min-width: 0;
-}
+.account-table-panel
+  min-width 0
 
-.account-type-panel {
-  padding: 16px;
-  position: sticky;
-  top: 82px;
-}
+.account-type-panel
+  padding 1rem
+  position sticky
+  top 5.125rem
 
-.account-panel-head {
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
+.account-panel-head
+  justify-content space-between
+  gap 0.75rem
+  margin-bottom 0.875rem
 
-.account-panel-head h3 {
-  font-size: 16px;
-}
+.account-panel-head h3
+  font-size 1rem
+  font-weight 900
 
-.account-type-card {
-  width: 100%;
-  gap: 10px;
-  padding: 11px 10px;
-  border: 1px solid #edf1f4;
-  border-radius: 8px;
-  background: #fbfcfd;
-  color: #10242f;
-  cursor: pointer;
-  text-align: left;
-}
+.account-type-card
+  width 100%
+  gap 0.75rem
+  padding 0.75rem
+  border 0.0625rem solid #edf3f2
+  border-radius 0.5rem
+  background linear-gradient(180deg, #ffffff 0%, #fbfefd 100%)
+  color #132933
+  cursor pointer
+  text-align left
+  transition border-color 0.18s ease, background 0.18s ease, transform 0.18s ease
 
-.account-type-card + .account-type-card {
-  margin-top: 8px;
-}
+.account-type-card + .account-type-card
+  margin-top 0.5rem
 
 .account-type-card:hover,
-.account-type-card.active {
-  border-color: #bfe5df;
-  background: #f4fbfa;
-}
+.account-type-card.active
+  border-color #9bd8d1
+  background #f3fbf9
+  transform translateY(-0.0625rem)
+
+.account-type-card.active
+  box-shadow 0 0 0 0.1875rem rgba(38, 166, 154, 0.09)
 
 .account-type-icon,
-.account-row-icon {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-}
+.account-row-icon
+  display inline-grid
+  place-items center
+  flex 0 0 auto
 
-.account-type-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-}
+.account-type-icon
+  width 2.5rem
+  height 2.5rem
+  border-radius 0.5rem
 
-.account-row-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-}
+.account-row-icon
+  width 2.25rem
+  height 2.25rem
+  border-radius 0.5rem
 
-.account-type-main {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 3px;
-}
+.account-type-main
+  min-width 0
+  flex 1
+  display grid
+  gap 0.1875rem
 
-.account-type-card em {
-  color: #10242f;
-  font-style: normal;
-  font-weight: 800;
-  white-space: nowrap;
-}
+.account-type-main strong
+  overflow hidden
+  text-overflow ellipsis
+  white-space nowrap
 
-.account-table-panel {
-  overflow: hidden;
-}
+.account-type-card em
+  color #132933
+  font-style normal
+  font-weight 900
+  white-space nowrap
+  font-variant-numeric tabular-nums
 
-.account-table-panel .table-head {
-  padding: 16px 18px 0;
-}
+.account-table-panel
+  overflow hidden
 
-.account-table-panel :deep(.el-table) {
-  --el-table-border-color: #edf1f5;
-  --el-table-header-bg-color: #f6f8fb;
-  --el-table-row-hover-bg-color: #f8fbfb;
-}
+.account-table-panel .table-head
+  padding 1rem 1.125rem
+  margin 0
+  background linear-gradient(180deg, #fbfefd 0%, #ffffff 100%)
+  border-bottom 0.0625rem solid #edf3f2
 
-.account-table-panel :deep(.el-table th.el-table__cell) {
-  color: #667985;
-  font-weight: 700;
-}
+.account-table-panel :deep(.el-table)
+  --el-table-border-color #edf3f2
+  --el-table-header-bg-color #f5faf9
+  --el-table-row-hover-bg-color #f3fbf9
+
+.account-table-panel :deep(.el-table th.el-table__cell)
+  color #5f7580
+  font-weight 800
 
 .account-table-panel :deep(.el-table td.el-table__cell),
-.account-table-panel :deep(.el-table th.el-table__cell) {
-  padding-top: 13px;
-  padding-bottom: 13px;
-}
+.account-table-panel :deep(.el-table th.el-table__cell)
+  padding-top 0.875rem
+  padding-bottom 0.875rem
 
-.account-name-cell {
-  gap: 10px;
-  min-width: 0;
-}
+.account-table-panel .manage-pagination
+  margin 0 1.125rem
+  padding 0.875rem 0 1rem
 
-.account-name-cell > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
+.account-name-cell
+  gap 0.75rem
+  min-width 0
 
-.account-name-cell strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.account-name-cell > div
+  min-width 0
+  display grid
+  gap 0.25rem
 
-.account-amount {
-  color: #10242f;
-  font-size: 15px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
+.account-name-cell strong
+  overflow hidden
+  text-overflow ellipsis
+  white-space nowrap
+  color #132933
 
-.account-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 14px;
-}
+.account-amount
+  color #132933
+  font-size 0.9375rem
+  font-weight 900
+  font-variant-numeric tabular-nums
 
-.account-color-field {
-  gap: 10px;
-  min-height: 32px;
-  color: #667985;
-}
+.account-form-grid
+  display grid
+  grid-template-columns repeat(2, minmax(0, 1fr))
+  gap 0 0.875rem
 
-.account-dialog :deep(.el-dialog__body) {
-  padding-top: 8px;
-}
+.account-color-field
+  gap 0.625rem
+  min-height 2rem
+  color #667985
 
-@media (max-width: 1180px) {
+.account-dialog :deep(.el-dialog__body)
+  padding-top 0.5rem
+
+@media (max-width: 73.75rem)
   .account-stat-grid,
-  .account-workbench {
-    grid-template-columns: 1fr;
-  }
+  .account-workbench
+    grid-template-columns 1fr
 
-  .account-type-panel {
-    position: static;
-  }
-}
+  .account-type-panel
+    position static
 
-@media (max-width: 760px) {
+@media (max-width: 47.5rem)
   .account-page-head,
   .account-filter-row,
-  .account-control-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
+  .account-control-actions
+    align-items stretch
+    flex-direction column
 
   .account-page-head .el-button,
   .account-control-actions,
   .account-control-actions .el-button,
-  .account-search {
-    width: 100%;
-  }
+  .account-search
+    width 100%
 
-  .account-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
+  .account-form-grid
+    grid-template-columns 1fr
 </style>

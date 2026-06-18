@@ -5,7 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface FileStorageService {
 
-    Map<String, Object> upload(MultipartFile file);
+    Map<String, Object> upload(MultipartFile file, Long billId);
 
     String resolveFileUrl(String fileUrl);
 
