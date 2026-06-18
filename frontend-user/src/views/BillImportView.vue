@@ -10,6 +10,7 @@
             <span v-if="preview"> · 共 {{ preview.total }} 条 · 已选 {{ selectedRows.length }} 条</span>
             <span v-if="missingAccounts.length"> · 待创建账户 {{ missingAccounts.length }} 个</span>
           </p>
+          <small>当前账本没有账户也可以导入，识别到的新账户会在导入时自动创建。</small>
         </div>
       </div>
       <div class="import-toolbar-right">
@@ -43,7 +44,7 @@
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
         <div class="el-upload__text">拖入或选择微信导出的 Excel 账单</div>
         <template #tip>
-          <div class="el-upload__tip">支持微信支付账单明细列表，会自动识别交易时间、收支、金额、支付方式和备注。</div>
+          <div class="el-upload__tip">支持微信支付账单明细列表，会自动识别交易时间、收支、金额、支付方式和备注；没有匹配账户时会自动创建。</div>
         </template>
       </el-upload>
     </section>
@@ -460,6 +461,14 @@ onMounted(async () => {
   margin: 0.375rem 0 0;
   color: #7b8c96;
   font-size: 0.8125rem;
+}
+
+.import-file-card small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #28aa91;
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .import-toolbar-right {

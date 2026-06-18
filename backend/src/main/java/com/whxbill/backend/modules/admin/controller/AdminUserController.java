@@ -6,6 +6,7 @@ import com.whxbill.backend.common.api.ApiResponse;
 import com.whxbill.backend.common.exception.BusinessException;
 import com.whxbill.backend.modules.admin.dto.AdminUserSaveRequest;
 import com.whxbill.backend.modules.admin.vo.AdminUserVo;
+import com.whxbill.backend.modules.system.annotation.OperationLog;
 import com.whxbill.backend.modules.system.entity.SysRole;
 import com.whxbill.backend.modules.system.entity.SysUser;
 import com.whxbill.backend.modules.system.entity.SysUserRole;
@@ -82,6 +83,7 @@ public class AdminUserController {
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:user:create') or hasAuthority('admin:user:update')")
+    @OperationLog(module = "用户", type = "SAVE", value = "保存用户")
     public ApiResponse<AdminUserVo> save(@Valid @RequestBody AdminUserSaveRequest request) {
         SysUser existing = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
             .eq(SysUser::getUsername, request.getUsername())
@@ -128,6 +130,7 @@ public class AdminUserController {
     @PutMapping("/{userId}")
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:user:update')")
+    @OperationLog(module = "用户", type = "UPDATE", value = "修改用户")
     public ApiResponse<AdminUserVo> update(@PathVariable Long userId, @Valid @RequestBody AdminUserSaveRequest request) {
         request.setId(userId);
         return save(request);
@@ -136,6 +139,7 @@ public class AdminUserController {
     @DeleteMapping("/{userId}")
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:user:delete')")
+    @OperationLog(module = "用户", type = "DELETE", value = "删除用户")
     public ApiResponse<Boolean> delete(@PathVariable Long userId) {
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
         sysUserMapper.deleteById(userId);
@@ -144,6 +148,7 @@ public class AdminUserController {
 
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('admin:user:export')")
+    @OperationLog(module = "用户", type = "EXPORT", value = "导出用户列表")
     public void export(HttpServletResponse response) throws Exception {
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());

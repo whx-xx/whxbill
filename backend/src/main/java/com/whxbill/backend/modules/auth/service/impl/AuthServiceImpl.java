@@ -9,7 +9,9 @@ import com.whxbill.backend.modules.auth.dto.RegisterRequest;
 import com.whxbill.backend.modules.auth.service.AuthService;
 import com.whxbill.backend.modules.auth.vo.LoginResponse;
 import com.whxbill.backend.modules.bill.entity.BizBook;
+import com.whxbill.backend.modules.bill.entity.BizCategory;
 import com.whxbill.backend.modules.bill.mapper.BizBookMapper;
+import com.whxbill.backend.modules.bill.mapper.BizCategoryMapper;
 import com.whxbill.backend.modules.system.entity.SysRole;
 import com.whxbill.backend.modules.system.entity.SysUser;
 import com.whxbill.backend.modules.system.entity.SysUserRole;
@@ -48,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
     private final SysRoleMapper sysRoleMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final BizBookMapper bizBookMapper;
+    private final BizCategoryMapper bizCategoryMapper;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -98,6 +101,7 @@ public class AuthServiceImpl implements AuthService {
         defaultBook.setCurrencyCode("CNY");
         defaultBook.setIsDefault(1);
         bizBookMapper.insert(defaultBook);
+        initDefaultCategories(user.getId());
 
         LoginUser loginUser = customUserDetailsService.buildLoginUser(user);
         return issueToken(loginUser);
@@ -164,6 +168,34 @@ public class AuthServiceImpl implements AuthService {
         }
         if (count != null && count > 10) {
             throw new BusinessException(ResultCode.TOO_MANY_REQUESTS.getCode(), "登录过于频繁，请稍后重试");
+        }
+    }
+
+    private void initDefaultCategories(Long userId) {
+        String[][] categories = {
+            {"餐饮", "EXPENSE", "Bowl", "10"},
+            {"交通", "EXPENSE", "Van", "20"},
+            {"购物", "EXPENSE", "ShoppingBag", "30"},
+            {"生活缴费", "EXPENSE", "House", "40"},
+            {"娱乐", "EXPENSE", "Film", "50"},
+            {"医疗", "EXPENSE", "FirstAidKit", "60"},
+            {"其他支出", "EXPENSE", "MoreFilled", "90"},
+            {"工资", "INCOME", "Money", "10"},
+            {"红包转账", "INCOME", "Wallet", "20"},
+            {"退款", "INCOME", "RefreshLeft", "30"},
+            {"其他收入", "INCOME", "MoreFilled", "90"}
+        };
+        for (String[] item : categories) {
+            BizCategory category = new BizCategory();
+            category.setUserId(userId);
+            category.setBookId(0L);
+            category.setParentId(0L);
+            category.setCategoryName(item[0]);
+            category.setCategoryType(item[1]);
+            category.setIcon(item[2]);
+            category.setLevel(1);
+            category.setSortOrder(Integer.valueOf(item[3]));
+            bizCategoryMapper.insert(category);
         }
     }
 }

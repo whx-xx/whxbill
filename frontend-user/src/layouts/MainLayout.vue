@@ -195,6 +195,7 @@ const noticeDialogVisible = ref(false)
 const baseMenus = [
   { path: '/books', label: '账本管理', icon: Files },
   { path: '/bills', label: '账单管理', icon: Tickets },
+  { path: '/bill-import', label: 'Excel导入', icon: DocumentAdd },
   { path: '/budgets', label: '预算管理', icon: Opportunity },
   { path: '/statistics', label: '统计分析', icon: DataAnalysis },
   { path: '/calendar', label: '日历视图', icon: Calendar },
@@ -204,13 +205,7 @@ const baseMenus = [
   { path: '/notes', label: '我的笔记', icon: Notebook }
 ]
 
-const menus = computed(() => {
-  const items = [...baseMenus]
-  if (importWorkspaceRowCount.value > 0) {
-    items.splice(2, 0, { path: '/bill-import', label: 'Excel导入', icon: DocumentAdd })
-  }
-  return items
-})
+const menus = computed(() => baseMenus)
 
 const sidebarWidth = computed(() => (layoutStore.sidebarCollapsed ? 72 : 216))
 const sidebarWidthRem = computed(() => `${sidebarWidth.value / 16}rem`)

@@ -5,6 +5,7 @@ import com.whxbill.backend.common.api.ApiResponse;
 import com.whxbill.backend.common.exception.BusinessException;
 import com.whxbill.backend.modules.admin.dto.AdminRoleSaveRequest;
 import com.whxbill.backend.modules.admin.vo.RolePermissionTreeVo;
+import com.whxbill.backend.modules.system.annotation.OperationLog;
 import com.whxbill.backend.modules.system.entity.SysPermission;
 import com.whxbill.backend.modules.system.entity.SysRole;
 import com.whxbill.backend.modules.system.entity.SysRolePermission;
@@ -77,6 +78,7 @@ public class AdminRoleController {
     @PostMapping("/roles")
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:role:create') or hasAuthority('admin:role:update')")
+    @OperationLog(module = "角色", type = "SAVE", value = "保存角色")
     public ApiResponse<SysRole> saveRole(@Valid @RequestBody AdminRoleSaveRequest request) {
         SysRole existing = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
             .eq(SysRole::getRoleCode, request.getRoleCode())
@@ -115,6 +117,7 @@ public class AdminRoleController {
     @PutMapping("/roles/{roleId}")
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:role:update')")
+    @OperationLog(module = "角色", type = "UPDATE", value = "修改角色")
     public ApiResponse<SysRole> updateRole(@PathVariable Long roleId, @Valid @RequestBody AdminRoleSaveRequest request) {
         request.setId(roleId);
         return saveRole(request);
@@ -123,6 +126,7 @@ public class AdminRoleController {
     @DeleteMapping("/roles/{roleId}")
     @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasAuthority('admin:role:delete')")
+    @OperationLog(module = "角色", type = "DELETE", value = "删除角色")
     public ApiResponse<Boolean> deleteRole(@PathVariable Long roleId) {
         sysRolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
         sysRoleMapper.deleteById(roleId);

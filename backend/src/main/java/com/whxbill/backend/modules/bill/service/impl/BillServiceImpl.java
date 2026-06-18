@@ -58,6 +58,7 @@ public class BillServiceImpl implements BillService {
     private static final String SOURCE_TYPE_AUTO = "AUTO";
     private static final String MESSAGE_TYPE_BUDGET_ALERT = "BUDGET_ALERT";
     private static final String BUDGET_ALERT_TITLE = "预算超支提醒";
+    private static final Long SHARED_CATEGORY_BOOK_ID = 0L;
 
     private final BizBillMapper bizBillMapper;
     private final BizAccountMapper bizAccountMapper;
@@ -156,14 +157,12 @@ public class BillServiceImpl implements BillService {
             throw new BusinessException("未识别到微信账单表头，请确认文件包含交易时间、收/支、金额等列");
         }
 
+        ensureDefaultCategories(userId);
         List<BizAccount> accounts = bizAccountMapper.selectList(new LambdaQueryWrapper<BizAccount>()
             .eq(BizAccount::getUserId, userId)
             .eq(BizAccount::getBookId, bookId)
             .orderByAsc(BizAccount::getSortOrder)
             .orderByDesc(BizAccount::getId));
-        if (accounts.isEmpty()) {
-            throw new BusinessException("当前账本暂无账户，请先创建账户");
-        }
         List<BizCategory> categories = bizCategoryMapper.selectList(new LambdaQueryWrapper<BizCategory>()
             .eq(BizCategory::getUserId, userId)
             .orderByAsc(BizCategory::getSortOrder)
@@ -377,6 +376,9 @@ public class BillServiceImpl implements BillService {
             }
         }
         String accountName = firstNotBlank(row.getAccountName(), inferAccountName(row.getPaymentMethod()));
+        if (accountName == null || accountName.isBlank()) {
+            accountName = "微信";
+        }
         BizAccount existing = bizAccountMapper.selectOne(new LambdaQueryWrapper<BizAccount>()
             .eq(BizAccount::getUserId, userId)
             .eq(BizAccount::getBookId, row.getBookId())
@@ -394,6 +396,39 @@ public class BillServiceImpl implements BillService {
         account.setSortOrder(99);
         bizAccountMapper.insert(account);
         return account;
+    }
+
+    private void ensureDefaultCategories(Long userId) {
+        Long categoryCount = bizCategoryMapper.selectCount(new LambdaQueryWrapper<BizCategory>()
+            .eq(BizCategory::getUserId, userId));
+        if (categoryCount != null && categoryCount > 0) {
+            return;
+        }
+        String[][] categories = {
+            {"餐饮", "EXPENSE", "Bowl", "10"},
+            {"交通", "EXPENSE", "Van", "20"},
+            {"购物", "EXPENSE", "ShoppingBag", "30"},
+            {"生活缴费", "EXPENSE", "House", "40"},
+            {"娱乐", "EXPENSE", "Film", "50"},
+            {"医疗", "EXPENSE", "FirstAidKit", "60"},
+            {"其他支出", "EXPENSE", "MoreFilled", "90"},
+            {"工资", "INCOME", "Money", "10"},
+            {"红包转账", "INCOME", "Wallet", "20"},
+            {"退款", "INCOME", "RefreshLeft", "30"},
+            {"其他收入", "INCOME", "MoreFilled", "90"}
+        };
+        for (String[] item : categories) {
+            BizCategory category = new BizCategory();
+            category.setUserId(userId);
+            category.setBookId(SHARED_CATEGORY_BOOK_ID);
+            category.setParentId(0L);
+            category.setCategoryName(item[0]);
+            category.setCategoryType(item[1]);
+            category.setIcon(item[2]);
+            category.setLevel(1);
+            category.setSortOrder(Integer.valueOf(item[3]));
+            bizCategoryMapper.insert(category);
+        }
     }
 
     private BizAccount matchAccount(String accountName, String paymentMethod, List<BizAccount> accounts) {

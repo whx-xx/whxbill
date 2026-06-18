@@ -16,10 +16,23 @@
 
     <div class="admin-card">
       <div class="admin-filter-bar">
-        <el-input v-model="filters.keyword" placeholder="搜索操作人 / 模块 / 接口" clearable />
-        <el-select v-model="filters.operationType" clearable placeholder="筛选类型">
+        <el-input v-model="filters.keyword" placeholder="搜索操作人 / 模块 / 接口 / 内容" clearable @keyup.enter="loadLogs" @clear="loadLogs" />
+        <el-select v-model="filters.moduleName" clearable placeholder="筛选模块" @change="loadLogs" @clear="loadLogs">
+          <el-option v-for="module in moduleNames" :key="module" :label="module" :value="module" />
+        </el-select>
+        <el-select v-model="filters.operationType" clearable placeholder="筛选类型" @change="loadLogs" @clear="loadLogs">
           <el-option v-for="type in operationTypes" :key="type" :label="type" :value="type" />
         </el-select>
+        <el-date-picker
+          v-model="filters.timeRange"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          range-separator="至"
+          clearable
+          @change="loadLogs"
+        />
         <div class="admin-toolbar-right">
           <el-button @click="resetFilters">重置</el-button>
           <el-button :icon="Refresh" @click="loadLogs">刷新</el-button>
@@ -38,10 +51,15 @@
         </div>
       </div>
       <el-table :data="pagedLogs" stripe height="520">
+        <el-table-column label="操作时间" min-width="170">
+          <template #default="{ row }">{{ formatDateTime(row.createdTime) }}</template>
+        </el-table-column>
         <el-table-column prop="operatorName" label="操作人" min-width="120" />
         <el-table-column prop="moduleName" label="模块" min-width="140" />
         <el-table-column prop="operationType" label="类型" min-width="120" />
+        <el-table-column prop="requestMethod" label="方法" min-width="90" />
         <el-table-column prop="requestUri" label="接口" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="operationContent" label="具体操作" min-width="260" show-overflow-tooltip />
         <el-table-column prop="ipAddress" label="IP" min-width="130" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -57,12 +75,14 @@
 
     <el-drawer v-model="detailVisible" title="日志详情" size="26.25rem">
       <el-descriptions v-if="currentLog" :column="1" border>
+        <el-descriptions-item label="操作时间">{{ formatDateTime(currentLog.createdTime) }}</el-descriptions-item>
         <el-descriptions-item label="操作人">{{ currentLog.operatorName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="模块">{{ currentLog.moduleName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="类型">{{ currentLog.operationType || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="请求方法">{{ currentLog.requestMethod || '-' }}</el-descriptions-item>
         <el-descriptions-item label="接口">{{ currentLog.requestUri || '-' }}</el-descriptions-item>
         <el-descriptions-item label="IP">{{ currentLog.ipAddress || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="内容">{{ currentLog.operationContent || currentLog.description || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="具体操作">{{ currentLog.operationContent || currentLog.description || '-' }}</el-descriptions-item>
       </el-descriptions>
     </el-drawer>
   </div>
@@ -77,23 +97,52 @@ import request from '@/utils/request'
 const logs = ref<any[]>([])
 const currentLog = ref<any>()
 const detailVisible = ref(false)
-const filters = reactive({ keyword: '', operationType: undefined as string | undefined })
+const filters = reactive({
+  keyword: '',
+  moduleName: undefined as string | undefined,
+  operationType: undefined as string | undefined,
+  timeRange: [] as string[]
+})
 const pagination = reactive({ page: 1, pageSize: 10 })
 
+const moduleNames = computed(() => [...new Set(logs.value.map((item) => item.moduleName).filter(Boolean))])
 const operationTypes = computed(() => [...new Set(logs.value.map((item) => item.operationType).filter(Boolean))])
 const filteredLogs = computed(() => logs.value.filter((item) => {
   const keyword = filters.keyword.trim().toLowerCase()
-  const matchKeyword = !keyword || item.operatorName?.toLowerCase().includes(keyword) || item.moduleName?.toLowerCase().includes(keyword) || item.requestUri?.toLowerCase().includes(keyword)
+  const content = `${item.operatorName || ''} ${item.moduleName || ''} ${item.operationType || ''} ${item.requestMethod || ''} ${item.requestUri || ''} ${item.ipAddress || ''} ${item.operationContent || ''}`.toLowerCase()
+  const matchKeyword = !keyword || content.includes(keyword)
+  const matchModule = !filters.moduleName || item.moduleName === filters.moduleName
   const matchType = !filters.operationType || item.operationType === filters.operationType
-  return matchKeyword && matchType
+  return matchKeyword && matchModule && matchType
 }))
 const dangerCount = computed(() => logs.value.filter((item) => `${item.operationType || ''}`.toLowerCase().includes('delete')).length)
 const moduleCount = computed(() => new Set(logs.value.map((item) => item.moduleName)).size)
 const pagedLogs = computed(() => filteredLogs.value.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize))
 
-async function loadLogs() { logs.value = await request.get('/api/admin/logs'); pagination.page = 1 }
-function resetFilters() { filters.keyword = ''; filters.operationType = undefined }
+async function loadLogs() {
+  logs.value = await request.get('/api/admin/logs', {
+    params: {
+      keyword: filters.keyword || undefined,
+      moduleName: filters.moduleName,
+      operationType: filters.operationType,
+      startTime: filters.timeRange?.[0],
+      endTime: filters.timeRange?.[1]
+    }
+  })
+  pagination.page = 1
+}
+function resetFilters() {
+  filters.keyword = ''
+  filters.moduleName = undefined
+  filters.operationType = undefined
+  filters.timeRange = []
+  loadLogs()
+}
 function openDetail(row: any) { currentLog.value = row; detailVisible.value = true }
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  return value.replace('T', ' ').slice(0, 19)
+}
 async function removeLog(logId: number) {
   await ElMessageBox.confirm('删除该日志记录？', '删除日志', { type: 'warning' })
   await request.delete(`/api/admin/logs/${logId}`)
