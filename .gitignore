@@ -22,3 +22,5 @@ android-app/**/build/
 android-app/local.properties
 docs/
 deploy/
+*.zip
+*.mp4
