@@ -149,7 +149,16 @@ async function saveRole() {
   dialogVisible.value = false
   await loadData()
 }
-async function quickSaveRole(row: any) { await request.put(`/api/admin/roles/${row.id}`, { ...row, permissionIds: rolePermissions.value.find((item: any) => item.roleId === row.id)?.permissions?.map((item: any) => item.id) || [] }); ElMessage.success('状态已更新'); await loadData() }
+async function quickSaveRole(row: any) {
+  const previousStatus = row.status === 1 ? 0 : 1
+  try {
+    await request.put(`/api/admin/roles/${row.id}/status`, { status: row.status })
+    ElMessage.success('状态已更新')
+    await loadData()
+  } catch (error) {
+    row.status = previousStatus
+  }
+}
 async function removeRole(roleId: number) {
   await ElMessageBox.confirm('删除角色后将移除其权限关联，是否继续？', '删除角色', { type: 'warning' })
   await request.delete(`/api/admin/roles/${roleId}`)

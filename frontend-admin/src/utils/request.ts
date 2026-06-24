@@ -50,7 +50,7 @@ function friendlyErrorMessage(status?: number, message?: string, url?: string) {
     return '用户名或密码不正确，请检查后再试'
   }
   if (status === 401) {
-    return '登录状态已失效，请重新登录'
+    return message || '登录状态已失效，请重新登录'
   }
   if (status === 403) {
     return '当前账号没有权限访问该功能'

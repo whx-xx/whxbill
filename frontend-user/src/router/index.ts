@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
+  { path: '/', redirect: () => (localStorage.getItem('whx-user-token') ? '/bills' : '/login') },
   { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { public: true, title: '登录' } },
   { path: '/403', component: () => import('@/views/exception/ExceptionView.vue'), props: { code: '403' }, meta: { public: true, title: '无权限访问' } },
   { path: '/404', component: () => import('@/views/exception/ExceptionView.vue'), props: { code: '404' }, meta: { public: true, title: '页面不存在' } },
@@ -10,7 +11,6 @@ const routes = [
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     children: [
-      { path: '', redirect: '/bills' },
       { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { title: '个人资料' } },
       { path: 'books', name: 'books', component: () => import('@/views/BooksView.vue'), meta: { title: '账本管理' } },
       { path: 'bills', name: 'bills', component: () => import('@/views/BillsView.vue'), meta: { title: '账单管理' } },

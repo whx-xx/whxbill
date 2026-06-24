@@ -3,6 +3,7 @@ package com.whxbill.backend.modules.admin.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.whxbill.backend.common.api.ApiResponse;
 import com.whxbill.backend.common.exception.BusinessException;
+import com.whxbill.backend.modules.admin.dto.AdminStatusUpdateRequest;
 import com.whxbill.backend.modules.admin.dto.AdminRoleSaveRequest;
 import com.whxbill.backend.modules.admin.vo.RolePermissionTreeVo;
 import com.whxbill.backend.modules.system.annotation.OperationLog;
@@ -121,6 +122,23 @@ public class AdminRoleController {
     public ApiResponse<SysRole> updateRole(@PathVariable Long roleId, @Valid @RequestBody AdminRoleSaveRequest request) {
         request.setId(roleId);
         return saveRole(request);
+    }
+
+    @PutMapping("/roles/{roleId}/status")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('admin:role:update')")
+    @OperationLog(module = "角色", type = "STATUS", value = "修改角色状态")
+    public ApiResponse<SysRole> updateRoleStatus(
+        @PathVariable Long roleId,
+        @Valid @RequestBody AdminStatusUpdateRequest request
+    ) {
+        SysRole role = sysRoleMapper.selectById(roleId);
+        if (role == null) {
+            throw new BusinessException("角色不存在");
+        }
+        role.setStatus(request.getStatus());
+        sysRoleMapper.updateById(role);
+        return ApiResponse.success(role);
     }
 
     @DeleteMapping("/roles/{roleId}")

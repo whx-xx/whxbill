@@ -205,9 +205,11 @@ const baseMenus = [
   { path: '/notes', label: '我的笔记', icon: Notebook }
 ]
 
-const menus = computed(() => baseMenus)
+const menus = computed(() =>
+  baseMenus.filter((item) => item.path !== '/bill-import' || importWorkspaceRowCount.value > 0)
+)
 
-const sidebarWidth = computed(() => (layoutStore.sidebarCollapsed ? 72 : 216))
+const sidebarWidth = computed(() => (layoutStore.sidebarCollapsed ? 72 : 184))
 const sidebarWidthRem = computed(() => `${sidebarWidth.value / 16}rem`)
 const layoutVars = computed(() => ({
   '--sidebar-width': sidebarWidthRem.value
@@ -311,16 +313,16 @@ onUnmounted(() => {
 .main-layout {
   min-height: 100vh;
   background: var(--layout-bg, #f1f3f5);
-  --sidebar-width: 13.5rem;
+  --sidebar-width: 11.5rem;
 }
 
 .main-layout-aside {
   position: fixed;
-  width: 13.5rem !important;
-  min-width: 13.5rem !important;
-  max-width: 13.5rem !important;
-  flex-basis: 13.5rem !important;
-  --el-aside-width: 13.5rem !important;
+  width: 11.5rem !important;
+  min-width: 11.5rem !important;
+  max-width: 11.5rem !important;
+  flex-basis: 11.5rem !important;
+  --el-aside-width: 11.5rem !important;
   top: 0;
   left: 0;
   bottom: 0;
@@ -448,14 +450,14 @@ onUnmounted(() => {
 
 .main-layout-content {
   min-height: 100vh;
-  margin-left: 13.5rem !important;
+  margin-left: 11.5rem !important;
   transition: none;
 }
 
 .main-layout-header {
   position: fixed;
   top: 0;
-  left: 13.5rem !important;
+  left: 11.5rem !important;
   right: 0;
   z-index: 9;
   height: 4.25rem;
@@ -769,6 +771,57 @@ onUnmounted(() => {
 .notice-popup-footer span {
   color: #71808d;
   font-size: 0.8125rem;
+}
+
+@media (max-width: 87.5rem) {
+  .main-layout {
+    --sidebar-width: 4.5rem !important;
+  }
+
+  .main-layout-aside {
+    width: 4.5rem !important;
+    min-width: 4.5rem !important;
+    max-width: 4.5rem !important;
+    flex-basis: 4.5rem !important;
+    --el-aside-width: 4.5rem !important;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .main-layout-content {
+    margin-left: 4.5rem !important;
+  }
+
+  .main-layout-header {
+    left: 4.5rem !important;
+    padding: 0 0.75rem;
+  }
+
+  .main-layout-brand {
+    grid-template-columns: 1fr;
+  }
+
+  .main-layout-brand-copy,
+  .main-layout-nav-label {
+    display: none;
+  }
+
+  .main-layout-nav-item {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    grid-template-columns: 1fr;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline: auto;
+    padding: 0;
+  }
+
+  .main-layout-main {
+    padding: 0.75rem;
+  }
 }
 
 @media (max-width: 47.5rem) {

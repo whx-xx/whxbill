@@ -351,7 +351,6 @@ function normalizeRows(rows: any[]) {
 }
 
 function pieOption(rows: any[]) {
-  const total = rows.reduce((sum, item) => sum + Number(item.value || 0), 0)
   return {
     color: rows.map((item) => item.color),
     tooltip: {
@@ -359,35 +358,6 @@ function pieOption(rows: any[]) {
       confine: false,
       appendToBody: true,
       formatter: '{b}<br/>金额: {c}<br/>占比: {d}%'
-    },
-    graphic: {
-      type: 'group',
-      left: 'center',
-      top: '45%',
-      children: [
-        {
-          type: 'text',
-          left: 'center',
-          style: {
-            text: money(total),
-            fill: '#17252e',
-            fontSize: 18,
-            fontWeight: 800,
-            textAlign: 'center'
-          }
-        },
-        {
-          type: 'text',
-          left: 'center',
-          top: 24,
-          style: {
-            text: '合计',
-            fill: '#8f9cab',
-            fontSize: 12,
-            textAlign: 'center'
-          }
-        }
-      ]
     },
     series: [{
       type: 'pie',

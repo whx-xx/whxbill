@@ -55,15 +55,22 @@
         </el-table-column>
         <el-table-column label="状态" width="130">
           <template #default="{ row }">
-            <el-switch
-              v-model="row.status"
-              :active-value="1"
-              :inactive-value="0"
-              active-text="启用"
-              inactive-text="停用"
-              inline-prompt
-              @change="quickSaveUser(row)"
-            />
+            <el-tooltip
+              :content="isAdminAccount(row) ? 'admin 账号不能被禁用' : ''"
+              :disabled="!isAdminAccount(row)"
+              placement="top"
+            >
+              <el-switch
+                v-model="row.status"
+                :active-value="1"
+                :inactive-value="0"
+                :disabled="isAdminAccount(row)"
+                active-text="启用"
+                inactive-text="停用"
+                inline-prompt
+                @change="quickSaveUser(row)"
+              />
+            </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
@@ -162,6 +169,7 @@ async function loadUsers() { users.value = await request.get('/api/admin/users')
 async function loadRoles() { roles.value = await request.get('/api/admin/roles') }
 function resetFilters() { filters.keyword = ''; filters.roleId = undefined; filters.status = undefined }
 function resetForm() { Object.assign(form, emptyForm()) }
+function isAdminAccount(row: any) { return String(row?.username || '').toLowerCase() === 'admin' }
 function openCreate() { resetForm(); dialogVisible.value = true }
 function openEdit(row: any) { Object.assign(form, { ...emptyForm(), ...row, roleIds: [...(row.roleIds || [])], password: '', confirmPassword: '' }); dialogVisible.value = true }
 function validateUserForm() {
@@ -197,7 +205,16 @@ async function saveUser() {
   dialogVisible.value = false
   await loadUsers()
 }
-async function quickSaveUser(row: any) { await request.put(`/api/admin/users/${row.id}`, { ...row, password: '', confirmPassword: '' }); ElMessage.success('状态已更新'); await loadUsers() }
+async function quickSaveUser(row: any) {
+  const previousStatus = row.status === 1 ? 0 : 1
+  try {
+    await request.put(`/api/admin/users/${row.id}/status`, { status: row.status })
+    ElMessage.success('状态已更新')
+    await loadUsers()
+  } catch (error) {
+    row.status = previousStatus
+  }
+}
 async function removeUser(userId: number) {
   await ElMessageBox.confirm('删除后将无法恢复，是否继续？', '删除用户', { type: 'warning' })
   await request.delete(`/api/admin/users/${userId}`)

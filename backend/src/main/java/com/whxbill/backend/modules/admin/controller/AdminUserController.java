@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.whxbill.backend.common.api.ApiResponse;
 import com.whxbill.backend.common.exception.BusinessException;
+import com.whxbill.backend.modules.admin.dto.AdminStatusUpdateRequest;
 import com.whxbill.backend.modules.admin.dto.AdminUserSaveRequest;
 import com.whxbill.backend.modules.admin.vo.AdminUserVo;
 import com.whxbill.backend.modules.system.annotation.OperationLog;
@@ -134,6 +135,26 @@ public class AdminUserController {
     public ApiResponse<AdminUserVo> update(@PathVariable Long userId, @Valid @RequestBody AdminUserSaveRequest request) {
         request.setId(userId);
         return save(request);
+    }
+
+    @PutMapping("/{userId}/status")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('admin:user:update')")
+    @OperationLog(module = "用户", type = "STATUS", value = "修改用户状态")
+    public ApiResponse<AdminUserVo> updateStatus(
+        @PathVariable Long userId,
+        @Valid @RequestBody AdminStatusUpdateRequest request
+    ) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        if ("admin".equalsIgnoreCase(user.getUsername()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException("admin 账号不能被禁用");
+        }
+        user.setStatus(request.getStatus());
+        sysUserMapper.updateById(user);
+        return ApiResponse.success(buildUserVo(user));
     }
 
     @DeleteMapping("/{userId}")

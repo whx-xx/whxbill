@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+const routerBase = import.meta.env.BASE_URL || '/'
+
 const routes = [
   { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
   { path: '/403', component: () => import('@/views/exception/ExceptionView.vue'), props: { code: '403' }, meta: { public: true, title: '无权限访问' } },
@@ -22,7 +24,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.VITE_APP_BASE || '/'),
+  history: createWebHistory(routerBase),
   routes
 })
 

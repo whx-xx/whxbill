@@ -57,6 +57,7 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         // 先做登录频率限制，再交给 Spring Security 校验用户名和密码。
         checkLoginRateLimit(request.getUsername());
+        checkUserEnabled(request.getUsername());
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         LoginUser loginUser = (LoginUser) customUserDetailsService.loadUserByUsername(request.getUsername());
@@ -171,31 +172,75 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    private void checkUserEnabled(String username) {
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+            .eq(SysUser::getUsername, username)
+            .last("limit 1"));
+        if (user != null && !Integer.valueOf(1).equals(user.getStatus())) {
+            throw new BusinessException("账号已被禁用，请联系管理员");
+        }
+    }
+
     private void initDefaultCategories(Long userId) {
-        String[][] categories = {
-            {"餐饮", "EXPENSE", "Bowl", "10"},
-            {"交通", "EXPENSE", "Van", "20"},
-            {"购物", "EXPENSE", "ShoppingBag", "30"},
-            {"生活缴费", "EXPENSE", "House", "40"},
-            {"娱乐", "EXPENSE", "Film", "50"},
-            {"医疗", "EXPENSE", "FirstAidKit", "60"},
-            {"其他支出", "EXPENSE", "MoreFilled", "90"},
-            {"工资", "INCOME", "Money", "10"},
-            {"红包转账", "INCOME", "Wallet", "20"},
-            {"退款", "INCOME", "RefreshLeft", "30"},
-            {"其他收入", "INCOME", "MoreFilled", "90"}
-        };
-        for (String[] item : categories) {
-            BizCategory category = new BizCategory();
-            category.setUserId(userId);
-            category.setBookId(0L);
-            category.setParentId(0L);
-            category.setCategoryName(item[0]);
-            category.setCategoryType(item[1]);
-            category.setIcon(item[2]);
-            category.setLevel(1);
-            category.setSortOrder(Integer.valueOf(item[3]));
+        List<DefaultCategoryGroup> groups = List.of(
+            new DefaultCategoryGroup("健康医疗", "FirstAidKit", List.of("其他", "买药", "医院", "滋补保健")),
+            new DefaultCategoryGroup("送礼人情", "Present", List.of("其他", "打赏", "红包", "借出", "礼物", "孝敬长辈")),
+            new DefaultCategoryGroup("文化教育", "Reading", List.of("其他", "培训考试", "书报杂志", "学费")),
+            new DefaultCategoryGroup("居家生活", "House", List.of("其他", "家政清洁", "车位费", "房租还贷", "物业费", "燃气费", "水费", "电费", "话费宽带")),
+            new DefaultCategoryGroup("休闲娱乐", "Film", List.of("其他", "演出", "酒吧", "棋牌桌游", "足浴按摩", "运动健身", "电影唱歌", "旅游度假")),
+            new DefaultCategoryGroup("出行交通", "Van", List.of("其他", "保养修车", "飞机", "火车", "加油", "停车费", "公共交通", "打车")),
+            new DefaultCategoryGroup("食品餐饮", "KnifeFork", List.of("其他", "粮油调味", "请客吃饭", "生鲜食品", "休闲零食", "饮料酒水", "晚餐", "午餐", "早餐")),
+            new DefaultCategoryGroup("购物消费", "ShoppingBag", List.of("其他", "装修装饰", "办公用品", "宠物用品", "服饰运动", "母婴玩具", "配饰腕表", "生活电器", "虚拟充值", "手机数码", "个护美妆", "日常家居")),
+            new DefaultCategoryGroup("其他", "Help", List.of("其他", "慈善捐助", "理财支出", "罚款赔偿"))
+        );
+        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+            DefaultCategoryGroup group = groups.get(groupIndex);
+            BizCategory parent = buildCategory(userId, 0L, group.name(), group.icon(), 1, (groupIndex + 1) * 10);
+            bizCategoryMapper.insert(parent);
+            List<String> children = group.children();
+            for (int childIndex = 0; childIndex < children.size(); childIndex++) {
+                BizCategory child = buildCategory(
+                    userId,
+                    parent.getId(),
+                    children.get(childIndex),
+                    group.icon(),
+                    2,
+                    (childIndex + 1) * 10
+                );
+                bizCategoryMapper.insert(child);
+            }
+        }
+        List<DefaultIncomeCategory> incomeCategories = List.of(
+            new DefaultIncomeCategory("工资", "Money"),
+            new DefaultIncomeCategory("奖金", "Coin"),
+            new DefaultIncomeCategory("报销", "Document"),
+            new DefaultIncomeCategory("投资收益", "Wallet"),
+            new DefaultIncomeCategory("其他收入", "Help")
+        );
+        for (int index = 0; index < incomeCategories.size(); index++) {
+            DefaultIncomeCategory item = incomeCategories.get(index);
+            BizCategory category = buildCategory(userId, 0L, item.name(), item.icon(), 1, (index + 1) * 10);
+            category.setCategoryType("INCOME");
             bizCategoryMapper.insert(category);
         }
+    }
+
+    private BizCategory buildCategory(Long userId, Long parentId, String name, String icon, Integer level, Integer sortOrder) {
+        BizCategory category = new BizCategory();
+        category.setUserId(userId);
+        category.setBookId(0L);
+        category.setParentId(parentId);
+        category.setCategoryName(name);
+        category.setCategoryType("EXPENSE");
+        category.setIcon(icon);
+        category.setLevel(level);
+        category.setSortOrder(sortOrder);
+        return category;
+    }
+
+    private record DefaultCategoryGroup(String name, String icon, List<String> children) {
+    }
+
+    private record DefaultIncomeCategory(String name, String icon) {
     }
 }
