@@ -21,7 +21,7 @@
 
           <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="onSubmit">
             <el-form-item label="用户名" prop="username">
-              <el-input v-model.trim="form.username" placeholder="请输入用户名" size="large" />
+              <el-input v-model.trim="form.username" placeholder="请输入用户名" size="large" maxlength="64" show-word-limit />
             </el-form-item>
 
             <el-form-item label="密码" prop="password">
@@ -124,7 +124,7 @@ const form = reactive({
 })
 const confirmShake = ref(false)
 const confirmFieldFocused = ref(false)
-const passwordSlots = computed(() => form.password.split(''))
+const passwordSlots = computed(() => form.password.split('')) //把得到的输入abc12345 分割成 ['a', 'b', 'c', '1', '2', '3', '4', '5']
 const passwordsMatch = computed(() => Boolean(form.password) && form.confirmPassword === form.password)
 const confirmCaretOffset = computed(() => {
   const currentLength = Math.min(form.confirmPassword.length, form.password.length)
@@ -247,6 +247,9 @@ function drawLedgerMap(canvas: HTMLCanvasElement) {
   if (!context || !parent) return
   const ctx = context
 
+  // 做高清屏适配
+  // 很多电脑屏幕是 2 倍像素密度，如果只设置 CSS 宽高，canvas 会发虚。
+  // 所以这里把实际画布像素乘以 devicePixelRatio，再用 setTransform 把绘图坐标恢复成正常尺寸
   const ratio = window.devicePixelRatio || 1
   const rect = parent.getBoundingClientRect()
   const width = Math.max(1, rect.width)
@@ -276,6 +279,7 @@ function drawLedgerMap(canvas: HTMLCanvasElement) {
   animate()
 }
 
+// 柔和网格背景
 function drawSoftGrid(context: CanvasRenderingContext2D, width: number, height: number, elapsed: number) {
   const glow = context.createRadialGradient(width * 0.5, height * 0.48, 0, width * 0.5, height * 0.48, width * 0.44)
   glow.addColorStop(0, 'rgba(38, 166, 154, 0.18)')
@@ -304,6 +308,7 @@ function drawSoftGrid(context: CanvasRenderingContext2D, width: number, height: 
   context.restore()
 }
 
+// 中间账本数据卡片
 function drawLedgerCard(context: CanvasRenderingContext2D, width: number, height: number, elapsed: number) {
   const cardWidth = Math.min(width * 0.58, 19.5 * 16)
   const cardHeight = Math.min(height * 0.46, 14.5 * 16)
@@ -329,7 +334,8 @@ function drawLedgerCard(context: CanvasRenderingContext2D, width: number, height
   context.fillStyle = 'rgba(64, 141, 134, 0.22)'
   roundedRect(context, x + cardWidth * 0.1, y + cardHeight * 0.25, cardWidth * 0.54, 6, 3)
   context.fill()
-
+  
+  // 柱状图和折线图
   const bars = [0.46, 0.68, 0.4, 0.82, 0.58]
   bars.forEach((bar, index) => {
     const barWidth = cardWidth * 0.07
@@ -363,6 +369,7 @@ function drawLedgerCard(context: CanvasRenderingContext2D, width: number, height
   context.restore()
 }
 
+// 流动光点：定义路径
 function buildRoutes(width: number, height: number) {
   return [
     {
@@ -400,6 +407,7 @@ function buildRoutes(width: number, height: number) {
   ]
 }
 
+// 流动光点：让光点沿路径移动
 function drawFlowRoutes(
   context: CanvasRenderingContext2D,
   routes: Array<{
@@ -630,6 +638,7 @@ function setupInkReveal(canvas: HTMLCanvasElement) {
 onMounted(() => {
   const revealCanvas = revealCanvasRef.value
   if (revealCanvas?.parentElement) setupInkReveal(revealCanvas)
+  // 如果 canvas 存在，再继续访问它的父元素，避免空值报错
 
   const canvas = canvasRef.value
   if (!canvas?.parentElement) return

@@ -219,10 +219,12 @@ const textLineCount = computed(() => recognizedText.value.split(/\r?\n/).filter(
 const categoriesByType = computed(() => categories.value.filter((item) => item.categoryType === billForm.billType))
 const displayBillTime = computed(() => billForm.billTime ? billForm.billTime.replace('T', ' ') : '-')
 
+// 前端日期选择器使用 T 分隔，后端 LocalDateTime 也能接受这个格式。
 function toBackendDateTime(value?: string) {
   return value ? value.replace(' ', 'T').slice(0, 19) : ''
 }
 
+// 用户选择图片后开始本地 OCR：预览图片、预处理、调用 tesseract、生成草稿。
 async function onFileChange(file: UploadFile) {
   if (!file.raw || recognizing.value) return
   if (!file.raw.type.startsWith('image/')) {
@@ -234,6 +236,7 @@ async function onFileChange(file: UploadFile) {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = URL.createObjectURL(file.raw)
   try {
+    // 先在浏览器端把图片放大、灰度和增强对比度，再交给 tesseract.js，提高票据识别率。
     const processedImage = await preprocessImage(file.raw)
     const result = await Tesseract.recognize(processedImage, 'chi_sim+eng', {
       tessedit_pageseg_mode: '6',
@@ -253,6 +256,7 @@ async function onFileChange(file: UploadFile) {
   }
 }
 
+// 把识别文本提交给后端，生成结构化账单草稿。
 async function generateDraft() {
   const text = normalizeOcrText(recognizedText.value)
   if (!text) {
@@ -263,6 +267,7 @@ async function generateDraft() {
   if (generating.value) return
   generating.value = true
   try {
+    // 后端根据 OCR 文本提取金额、时间、商户、支付方式等字段，返回结构化账单草稿。
     const result = await request.post('/api/ocr/draft', { text })
     const localDraft = parseDraftLocally(text)
     const nextDraft = {
@@ -278,9 +283,11 @@ async function generateDraft() {
   }
 }
 
+// 将后端草稿映射到右侧表单，尽量自动填好账本、账户、分类、金额和备注。
 async function hydrateBillFormFromDraft(row: OcrDraft) {
   if (!currentBookId.value) await loadBooks()
   await loadReferenceData()
+  // 把草稿转换成右侧可编辑表单，用户确认后再真正保存到账单表。
   const billType = row.suggestedType || 'EXPENSE'
   const billTime = toInputDateTime(row.billTime) || `${currentDate()}T${currentTime()}`
   billForm.bookId = currentBookId.value
@@ -300,9 +307,11 @@ async function hydrateBillFormFromDraft(row: OcrDraft) {
   billForm.sourceType = 'OCR'
 }
 
+// 保存 OCR 账单：用户确认表单后，走普通账单新增接口。
 async function saveOcrBill() {
   if (!draft.value || savingBill.value) return
   if (!billForm.accountId) {
+    // OCR 识别到账户名称但本地没有对应账户时，保存前自动创建一个账户。
     billForm.accountId = await ensureRecognizedAccount(draft.value.accountName || draft.value.paymentMethod)
   }
   const valid = await billFormRef.value?.validate().catch(() => false)
@@ -327,6 +336,7 @@ async function saveOcrBill() {
   }
 }
 
+// 识别到账户但本地没有时，自动创建一个账户并返回新账户 id。
 async function ensureRecognizedAccount(name?: string) {
   const accountName = normalizeAccountName(name)
   if (!accountName || !billForm.bookId) return undefined
@@ -345,6 +355,7 @@ async function ensureRecognizedAccount(name?: string) {
   return result?.id || accounts.value.find((item) => item.accountName === accountName)?.id
 }
 
+// 加载当前账本下的账户和分类，OCR 草稿填充表单时需要用它们做匹配。
 async function loadReferenceData() {
   if (!currentBookId.value) return
   const [accountList, expenseCategories, incomeCategories] = await Promise.all([
@@ -356,7 +367,9 @@ async function loadReferenceData() {
   categories.value = [...expenseCategories, ...incomeCategories]
 }
 
+// 清理 OCR 文本，减少识别噪声对后端规则解析的影响。
 function normalizeOcrText(text: string) {
+  // 清理 OCR 常见噪声：中文间空格、全角冒号、长横线和多余空行。
   return text
     .replace(/\u00a0/g, ' ')
     .replace(/(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, '')
@@ -368,6 +381,7 @@ function normalizeOcrText(text: string) {
     .join('\n')
 }
 
+// 前端兜底解析草稿：即使后端返回字段不全，也能在页面上给用户一个初步结果。
 function parseDraftLocally(text: string): OcrDraft {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
   const productName = findValue(lines, ['商品', '商品名称']) || inferProduct(lines)
@@ -391,6 +405,7 @@ function parseDraftLocally(text: string): OcrDraft {
   }
 }
 
+// 从一组文本行里按标签提取值，和后端 OcrController 的策略保持一致。
 function findValue(lines: string[], labels: string[]) {
   for (let index = 0; index < lines.length; index += 1) {
     const compact = lines[index].replace(/\s+/g, '')
@@ -405,6 +420,7 @@ function findValue(lines: string[], labels: string[]) {
   return ''
 }
 
+// 从 OCR 文本中猜金额，优先支持 + / - 符号金额。
 function guessAmount(lines: string[]) {
   for (const line of lines) {
     const signed = line.replace(/\s+/g, '').match(/([+-])(?:¥|￥)?(\d+(?:\.\d{1,2})?)/)
@@ -420,6 +436,7 @@ function guessAmount(lines: string[]) {
   return { amount, signedAmount: amount }
 }
 
+// 没有明确商品标签时，从较像业务摘要的中文行中推断商品名。
 function inferProduct(lines: string[]) {
   return lines.find((line) =>
     /[\u4e00-\u9fa5]/.test(line)
@@ -429,6 +446,7 @@ function inferProduct(lines: string[]) {
   ) || ''
 }
 
+// 统一时间格式，方便填入 Element Plus 日期时间选择器。
 function normalizeDateTime(value: string) {
   const normalized = value
     .replace('年', '-')
@@ -442,27 +460,32 @@ function normalizeDateTime(value: string) {
   return `${matched[1]}-${matched[2].padStart(2, '0')}-${matched[3].padStart(2, '0')} ${matched[4].padStart(2, '0')}:${matched[5].padStart(2, '0')}:${matched[6].padStart(2, '0')}`
 }
 
+// 后端返回的时间可能是空格分隔，这里转成 input 需要的 T 分隔。
 function toInputDateTime(value?: string) {
   if (!value) return ''
   return value.includes('T') ? value.slice(0, 19) : value.replace(' ', 'T').slice(0, 19)
 }
 
+// 当前日期兜底：OCR 没识别到时间时用当前日期。
 function currentDate() {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+// 当前时间兜底：OCR 没识别到时间时用当前时间。
 function currentTime() {
   const date = new Date()
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
 }
 
+// 根据支付方式文本匹配已有账户 id。
 function matchAccountId(name?: string) {
   const keyword = normalizeText(normalizeAccountName(name))
   if (!keyword) return undefined
   return accounts.value.find((item) => normalizeText(item.accountName).includes(keyword) || keyword.includes(normalizeText(item.accountName)))?.id
 }
 
+// 把“微信零钱、支付宝余额、银行卡尾号”等文本归一成账户名。
 function normalizeAccountName(name?: string) {
   const value = String(name || '').trim()
   if (!value || value === '-') return ''
@@ -473,6 +496,7 @@ function normalizeAccountName(name?: string) {
   return value.replace(/^[:：-]+/, '')
 }
 
+// 根据账户名推断账户类型。
 function inferAccountType(name: string) {
   if (/微信|零钱通/.test(name)) return 'WECHAT'
   if (/支付宝|余额宝/.test(name)) return 'ALIPAY'
@@ -480,6 +504,7 @@ function inferAccountType(name: string) {
   return 'CASH'
 }
 
+// 自动创建账户时，根据账户名给一个默认颜色。
 function inferAccountColor(name: string) {
   if (/微信|零钱通/.test(name)) return '#43C66A'
   if (/支付宝|余额宝/.test(name)) return '#1677FF'
@@ -487,6 +512,7 @@ function inferAccountColor(name: string) {
   return '#26A69A'
 }
 
+// 根据商户、商品和时间推断分类，餐饮会进一步区分早午晚餐。
 function inferCategoryId(row: OcrDraft) {
   const sameType = categories.value.filter((item) => item.categoryType === (row.suggestedType || 'EXPENSE'))
   const text = `${row.productName || ''} ${row.merchantName || ''} ${row.merchantFullName || ''}`
@@ -506,16 +532,20 @@ function inferCategoryId(row: OcrDraft) {
   return sameType[0]?.id
 }
 
+// 文本标准化，做账户/分类匹配时减少大小写和空格影响。
 function normalizeText(value?: string) {
   return String(value || '').replace(/\s+/g, '').toLowerCase()
 }
 
+// 金额格式化展示。
 function formatCurrency(value: number | string) {
   return `¥${Number(value || 0).toFixed(2)}`
 }
 
+// 图片预处理：放大、白底、灰度和对比度增强。
 async function preprocessImage(file: File) {
   const bitmap = await createImageBitmap(file)
+  // 根据原图宽度放大到适合识别的尺寸，图片太小会明显影响 OCR 效果。
   const scale = Math.min(3, Math.max(1.5, 1800 / bitmap.width))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(bitmap.width * scale)
@@ -532,6 +562,7 @@ async function preprocessImage(file: File) {
   for (let index = 0; index < data.length; index += 4) {
     const gray = data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114
     const boosted = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128))
+    // 做灰度化和对比度增强
     data[index] = boosted
     data[index + 1] = boosted
     data[index + 2] = boosted
@@ -542,6 +573,7 @@ async function preprocessImage(file: File) {
   })
 }
 
+// 清空 OCR 工作区，释放本地预览 URL。
 function resetWorkspace() {
   recognizedText.value = ''
   draft.value = null

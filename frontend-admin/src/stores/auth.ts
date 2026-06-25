@@ -18,12 +18,7 @@ export const useAuthStore = defineStore('admin-auth', {
   actions: {
     async login(payload: { username: string; password: string }) {
       const result = await request.post('/api/auth/login', payload)
-      this.accessToken = result.accessToken
-      this.refreshToken = result.refreshToken
-      this.profile = result
-      localStorage.setItem(TOKEN_KEY, result.accessToken)
-      localStorage.setItem(REFRESH_KEY, result.refreshToken)
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(result))
+      this.setSession(result)
     },
     async loadProfile() {
       const result = await request.get('/api/user/profile')
@@ -34,6 +29,14 @@ export const useAuthStore = defineStore('admin-auth', {
         refreshToken: this.refreshToken
       }
       localStorage.setItem(PROFILE_KEY, JSON.stringify(this.profile))
+    },
+    setSession(payload: any) {
+      this.accessToken = payload.accessToken
+      this.refreshToken = payload.refreshToken
+      this.profile = payload
+      localStorage.setItem(TOKEN_KEY, payload.accessToken)
+      localStorage.setItem(REFRESH_KEY, payload.refreshToken)
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(payload))
     },
     clearSession() {
       this.accessToken = ''

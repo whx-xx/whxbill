@@ -13,7 +13,7 @@ public class StatisticsQuery {
     private String year;
     private Boolean includeChildren = false;
 
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) // yyyy-MM-dd
     private LocalDate startDate;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)

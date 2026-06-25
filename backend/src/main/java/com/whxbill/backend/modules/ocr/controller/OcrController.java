@@ -22,12 +22,17 @@ public class OcrController {
     private static final Pattern ANY_AMOUNT = Pattern.compile("(?:¥|￥)?\\s*(\\d+(?:\\.\\d{1,2})?)");
     private static final Pattern ORDER_NO = Pattern.compile("[A-Z0-9]{12,}");
 
+    /**
+     * 根据前端 OCR 文本生成账单草稿。这里不直接保存账单，用户确认后才调用账单新增接口。
+     */
     @PostMapping("/draft")
     @PreAuthorize("hasAuthority('bill:create')")
     public ApiResponse<Map<String, Object>> draft(@RequestBody Map<String, String> payload) {
         String rawText = payload.getOrDefault("text", "");
+        // 前端负责把图片识别成文字，后端负责把文字解析成可编辑的账单草稿。
         List<String> lines = normalizeLines(rawText);
 
+        // 商品名优先从明确标签中取，取不到再从文本行里推断。
         String productName = firstNonBlank(
             findValue(lines, "商品", "商品名称", "交易商品", "项目"),
             inferProduct(lines)
@@ -38,11 +43,13 @@ public class OcrController {
         String transactionNo = firstNonBlank(findValue(lines, "交易单号", "交易号", "流水号"), findOrderNo(lines, 0));
         String merchantOrderNo = firstNonBlank(findValue(lines, "商户单号", "商家单号", "订单号"), findOrderNo(lines, 1));
 
+        // 金额和收支类型是账单保存的核心字段，先由后端规则给出建议值。
         AmountGuess amountGuess = guessAmount(lines);
         String suggestedType = guessType(lines, amountGuess.signedAmount());
         String merchantName = firstNonBlank(productName, merchantFullName, firstBusinessLine(lines), "OCR 草稿");
 
         Map<String, Object> result = new HashMap<>();
+        // 返回 Map 是为了前端灵活展示识别依据和提示信息。
         result.put("merchantName", merchantName);
         result.put("productName", productName);
         result.put("merchantFullName", merchantFullName);
@@ -59,6 +66,9 @@ public class OcrController {
         return ApiResponse.success(result);
     }
 
+    /**
+     * 清洗 OCR 原文：去空白、统一符号、删除空行。
+     */
     private List<String> normalizeLines(String text) {
         return text.lines()
             .map(line -> line
@@ -72,8 +82,12 @@ public class OcrController {
             .toList();
     }
 
+    /**
+     * 按标签提取字段值。例如“支付方式: 微信零钱”会提取出“微信零钱”。
+     */
     private String findValue(List<String> lines, String... labels) {
         for (int index = 0; index < lines.size(); index++) {
+            // 先压缩空格，增强对 OCR 识别空格异常的容错。
             String compact = lines.get(index).replaceAll("\\s+", "");
             for (String label : labels) {
                 int position = compact.indexOf(label);
@@ -82,13 +96,18 @@ public class OcrController {
                     .replaceFirst("^[:：\\-]+", "")
                     .trim();
                 if (!value.isBlank()) return value;
+                // 有些票据是“标签在一行，值在下一行”，这里做下一行兜底。
                 if (index + 1 < lines.size()) return lines.get(index + 1).trim();
             }
         }
         return "";
     }
 
+    /**
+     * 从文本中猜测金额，同时保留 signedAmount 用于判断收支方向。
+     */
     private AmountGuess guessAmount(List<String> lines) {
+        // 优先识别带正负号的金额，例如 -￥76.00；没有正负号时再按“金额/实付/付款”等标签兜底。
         for (String line : lines) {
             Matcher matcher = SIGNED_AMOUNT.matcher(line.replace(" ", ""));
             if (matcher.find()) {
@@ -101,24 +120,30 @@ public class OcrController {
         String amountLine = firstNonBlank(findValue(lines, "金额", "实付", "付款", "收款"), "");
         Matcher labeled = ANY_AMOUNT.matcher(amountLine);
         if (labeled.find()) {
+            // 有明确金额标签时，优先采用标签后的金额。
             return new AmountGuess(labeled.group(1), labeled.group(1));
         }
 
         for (String line : lines) {
             Matcher matcher = ANY_AMOUNT.matcher(line);
             if (matcher.find() && !looksLikeDateOrOrder(line)) {
+                // 普通金额兜底时排除日期和长订单号，减少误识别。
                 return new AmountGuess(matcher.group(1), matcher.group(1));
             }
         }
         return new AmountGuess("0.00", "0.00");
     }
 
+    /**
+     * 根据金额方向和关键词猜测账单类型：EXPENSE 支出，INCOME 收入。
+     */
     private String guessType(List<String> lines, String signedAmount) {
         String text = String.join(" ", lines);
         try {
             if (new BigDecimal(signedAmount).compareTo(BigDecimal.ZERO) < 0) return "EXPENSE";
         } catch (NumberFormatException ignored) {
         }
+        // 金额没有方向时，用票据关键词判断收入或支出。
         if (text.contains("支出") || text.contains("付款") || text.contains("已支付") || text.contains("支付成功")) {
             return "EXPENSE";
         }
@@ -130,6 +155,9 @@ public class OcrController {
         return "EXPENSE";
     }
 
+    /**
+     * 把 OCR 识别出的中文日期或点号时间转换成后端更容易处理的标准格式。
+     */
     private String normalizeDateTime(String value) {
         if (value.isBlank()) return "";
         String normalized = value
@@ -141,6 +169,7 @@ public class OcrController {
             .trim();
         Matcher matcher = Pattern.compile("(\\d{4})-(\\d{1,2})-(\\d{1,2})\\s*(\\d{1,2})[:\\-](\\d{1,2})[:\\-](\\d{1,2})").matcher(normalized);
         if (!matcher.find()) return normalized;
+        // 月、日、时、分、秒都补齐两位，前端日期选择器和后端 LocalDateTime 更好解析。
         return "%s-%02d-%02d %02d:%02d:%02d".formatted(
             matcher.group(1),
             Integer.parseInt(matcher.group(2)),
@@ -151,6 +180,9 @@ public class OcrController {
         );
     }
 
+    /**
+     * 没有明确“商品名称”标签时，从普通中文行里推断一个较像商品/摘要的文本。
+     */
     private String inferProduct(List<String> lines) {
         for (String line : lines) {
             if (line.contains("支付成功") || line.contains("当前状态") || line.contains("商户") || line.contains("单号")) continue;
@@ -162,6 +194,9 @@ public class OcrController {
         return "";
     }
 
+    /**
+     * 兜底选择一行业务文本作为商户/摘要，排除订单号和状态类文本。
+     */
     private String firstBusinessLine(List<String> lines) {
         return lines.stream()
             .filter(line -> !line.matches(".*[A-Z0-9]{8,}.*"))
@@ -170,6 +205,9 @@ public class OcrController {
             .orElse("");
     }
 
+    /**
+     * 从文本中提取长订单号，skip=0 取第一个，skip=1 取第二个。
+     */
     private String findOrderNo(List<String> lines, int skip) {
         int seen = 0;
         for (String line : lines) {
@@ -180,6 +218,9 @@ public class OcrController {
         return "";
     }
 
+    /**
+     * 判断某一行是不是日期或订单号，避免金额兜底时误把日期数字当成金额。
+     */
     private boolean looksLikeDateOrOrder(String line) {
         String compact = line.replaceAll("\\s+", "");
         return compact.matches(".*\\d{4}年\\d{1,2}月\\d{1,2}日.*")
@@ -187,6 +228,9 @@ public class OcrController {
             || compact.matches(".*[A-Z0-9]{12,}.*");
     }
 
+    /**
+     * 根据缺失字段生成提示，前端会展示“仍需核对”的警告。
+     */
     private List<String> buildTips(String productName, String amount, String billTime, String paymentMethod) {
         List<String> tips = new ArrayList<>();
         if (productName.isBlank()) tips.add("未明确识别到商品名称");
@@ -196,6 +240,9 @@ public class OcrController {
         return tips;
     }
 
+    /**
+     * 返回第一个非空字符串，用于多种识别策略之间做优先级选择。
+     */
     private String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) return value.trim();

@@ -152,6 +152,7 @@ public class AdminUserController {
         if ("admin".equalsIgnoreCase(user.getUsername()) && !Integer.valueOf(1).equals(request.getStatus())) {
             throw new BusinessException("admin 账号不能被禁用");
         }
+        // 禁用用户只改 status，不删除数据；JWT 过滤器会在后续请求中实时拦截被禁用账号。
         user.setStatus(request.getStatus());
         sysUserMapper.updateById(user);
         return ApiResponse.success(buildUserVo(user));
@@ -162,8 +163,16 @@ public class AdminUserController {
     @PreAuthorize("hasAuthority('admin:user:delete')")
     @OperationLog(module = "用户", type = "DELETE", value = "删除用户")
     public ApiResponse<Boolean> delete(@PathVariable Long userId) {
-        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
-        sysUserMapper.deleteById(userId);
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        if ("admin".equalsIgnoreCase(user.getUsername())) {
+            throw new BusinessException("admin 账号不能删除");
+        }
+        // 用户管理删除采用物理删除，先删关联角色，避免外键约束阻止删除用户主表。
+        sysUserRoleMapper.physicalDeleteByUserId(userId);
+        sysUserMapper.physicalDeleteById(userId);
         return ApiResponse.success(Boolean.TRUE);
     }
 

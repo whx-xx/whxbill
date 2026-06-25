@@ -43,6 +43,7 @@ public interface BizBillMapper extends BaseMapper<BizBill> {
         """)
     List<Map<String, Object>> selectDailyTrend(Long userId, String month);
 
+    // coalesce(..., 0) 是为了防止没有数据时返回 null，统一返回 0
     @Select("""
         <script>
         select coalesce(sum(case when bill_type = 'EXPENSE' then amount else 0 end), 0) as expense,

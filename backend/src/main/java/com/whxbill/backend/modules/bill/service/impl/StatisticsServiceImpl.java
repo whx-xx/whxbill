@@ -30,6 +30,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final ObjectMapper objectMapper;
     private final RedisCacheSupport redisCacheSupport;
 
+    /**
+     * 兼容旧调用：只传月份时，默认按月统计。
+     */
     @Override
     public Map<String, Object> getDashboard(String month) {
         StatisticsQuery query = new StatisticsQuery();
@@ -38,10 +41,14 @@ public class StatisticsServiceImpl implements StatisticsService {
         return getDashboard(query);
     }
 
+    /**
+     * 统计仪表盘主方法：按查询条件返回汇总、分类统计和趋势数据，并使用 Redis 缓存。
+     */
     @Override
     public Map<String, Object> getDashboard(StatisticsQuery query) {
         DateRange range = resolveDateRange(query);
         boolean includeChildren = Boolean.TRUE.equals(query.getIncludeChildren());
+        // 缓存维度包含用户、账本、时间范围和是否合并子分类，避免不同统计条件互相污染。
         String cacheKey = DASHBOARD_CACHE_PREFIX + SecurityUtils.getUserId() + ":" + query.getBookId() + ":"
             + range.startDate() + ":" + range.endDate() + ":" + includeChildren;
         String lockKey = "whx:bill:lock:dashboard:" + SecurityUtils.getUserId() + ":" + query.getBookId() + ":"
@@ -52,15 +59,19 @@ public class StatisticsServiceImpl implements StatisticsService {
                 return Map.of("summary", Map.of(), "expenseCategories", java.util.List.of(), "incomeCategories", java.util.List.of(), "trend", java.util.List.of());
             }
             try {
+                // 命中缓存时直接把 JSON 还原成 Map，减少统计 SQL 压力。
                 return objectMapper.readValue(cached, new TypeReference<>() {
                 });
             } catch (Exception ignored) {
+                // 缓存反序列化失败就忽略，重新查数据库并覆盖缓存。
             }
         }
+        // 加锁，防止缓存击穿，如果很多请求同时查同一份统计数据，只有一个请求真正查数据库，其他请求稍等后读缓存
         boolean locked = redisCacheSupport.tryLock(lockKey, LOCK_TTL);
         try {
             if (!locked) {
                 try {
+                    // 没抢到锁的请求稍等片刻，让抢到锁的请求先把结果写入缓存。
                     Thread.sleep(120L);
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
@@ -69,6 +80,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             }
 
             Map<String, Object> result = new HashMap<>();
+            // 仪表盘一次返回总览、分类占比和趋势数据，前端统计页可以一次请求完成渲染。
             result.put("summary", bizBillMapper.selectSummary(SecurityUtils.getUserId(), query.getBookId(), range.startDate(), range.endDate()));
             result.put("expenseCategories", bizBillMapper.selectCategoryStats(SecurityUtils.getUserId(), query.getBookId(),
                 "EXPENSE", range.startDate(), range.endDate(), includeChildren));
@@ -82,6 +94,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 stringRedisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result),
                     redisCacheSupport.withRandomSeconds(CACHE_TTL, 180));
             } catch (Exception ignored) {
+                // 缓存写入失败不影响接口返回，最多下一次重新查数据库。
             }
             return result;
         } finally {
@@ -91,6 +104,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         }
     }
 
+    /**
+     * 根据统计模式计算日期范围：年、月、自定义区间三种。
+     */
     private DateRange resolveDateRange(StatisticsQuery query) {
         String mode = query.getMode() == null ? "month" : query.getMode();
         if ("year".equalsIgnoreCase(mode)) {

@@ -301,6 +301,7 @@ const periodLabel = computed(() => {
   return selectedMonth.value ? selectedMonth.value.replace('-', '年') + '月' : '请选择月份'
 })
 const reportTitle = computed(() => mode.value === 'year' ? '月报表' : '日报表')
+// 明细抽屉中需要把账本、账户、分类 id 快速翻译成名称，所以提前构造成 Map。
 const bookNameMap = computed(() =>
   Object.fromEntries(books.value.map((item) => [item.id, item.bookName]))
 )
@@ -337,8 +338,10 @@ const trendOption = computed(() => ({
 const expensePieOption = computed(() => pieOption(expenseRows.value))
 const incomePieOption = computed(() => pieOption(incomeRows.value))
 
+// 把后端统计行加工成前端图表/明细共用的数据结构。
 function normalizeRows(rows: any[]) {
   const total = rows.reduce((sum, item) => sum + Number(item.value || 0), 0)
+  // 后端只返回统计值，前端在这里补颜色、占比和小分类过滤，供饼图和右侧明细共用。
   return rows
     .map((item, index) => ({
       ...item,
@@ -350,6 +353,7 @@ function normalizeRows(rows: any[]) {
     .filter((item) => !filterSmall.value || item.percent >= 1)
 }
 
+// 生成 ECharts 饼图配置，收入和支出两个饼图复用这套逻辑。
 function pieOption(rows: any[]) {
   return {
     color: rows.map((item) => item.color),
@@ -380,10 +384,12 @@ function pieOption(rows: any[]) {
   }
 }
 
+// 普通金额格式化。
 function money(value: number | string) {
   return Number(value || 0).toFixed(2)
 }
 
+// 根据分类名或 icon 字段选择一个合适的图标组件。
 function categoryIcon(item: any) {
   const key = String(item?.icon || item?.name || '').toLowerCase()
   if (key.includes('food') || key.includes('餐') || key.includes('饭')) return KnifeFork
@@ -436,6 +442,7 @@ function categoryIcon(item: any) {
   return Wallet
 }
 
+// 根据收入、支出、结余三种语义展示金额符号。
 function signedMoney(value: number | string, type: 'EXPENSE' | 'INCOME' | 'BALANCE') {
   const number = Number(value || 0)
   if (type === 'EXPENSE') return `-${money(Math.abs(number))}`
@@ -443,12 +450,14 @@ function signedMoney(value: number | string, type: 'EXPENSE' | 'INCOME' | 'BALAN
   return `${number >= 0 ? '+' : '-'}${money(Math.abs(number))}`
 }
 
+// 趋势图横轴标签：年模式显示月份，月/自定义模式显示日期。
 function dayLabel(value?: string) {
   if (!value) return '-'
   if (mode.value === 'year') return `${Number(value.split('-').pop())}月`
   return `${Number(value.split('-').pop())}日`
 }
 
+// 通过queryParams把筛选条件组装成后端需要的参数
 function queryParams() {
   const params: any = {
     mode: mode.value,
@@ -464,6 +473,7 @@ function queryParams() {
   return params
 }
 
+// 切换统计模式后初始化对应日期，并重新加载仪表盘。
 function handleModeChange() {
   activeCategory.value = undefined
   if (mode.value === 'month' && !selectedMonth.value) selectedMonth.value = currentMonth()
@@ -474,11 +484,13 @@ function handleModeChange() {
   loadDashboard()
 }
 
+// 返回当前月份，格式 yyyy-MM。
 function currentMonth() {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+// 自定义区间默认取当前月完整范围。
 function currentMonthRange() {
   const date = new Date()
   const start = new Date(date.getFullYear(), date.getMonth(), 1)
@@ -486,29 +498,35 @@ function currentMonthRange() {
   return [formatDate(start), formatDate(end)]
 }
 
+// Date 转 yyyy-MM-dd 字符串。
 function formatDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+// 切换是否合并二级分类后重新请求后端统计。
 function setIncludeChildren(value: boolean) {
   includeChildren.value = value
   activeCategory.value = undefined
   loadDashboard()
 }
 
+// 切换是否过滤占比小于 1% 的分类。
 function setFilterSmall(value: boolean) {
   filterSmall.value = value
   activeCategory.value = undefined
 }
 
+// 加载统计仪表盘数据。
 async function loadDashboard() {
   if (mode.value === 'month' && !selectedMonth.value) return
   if (mode.value === 'year' && !selectedYear.value) return
   if (mode.value === 'custom' && (!dateRange.value?.[0] || !dateRange.value?.[1])) return
   activeCategory.value = undefined
+  // 根据当前筛选条件请求统计仪表盘，返回总览、趋势、收入分类和支出分类。
   dashboard.value = await request.get('/api/statistics/dashboard', { params: queryParams() })
 }
 
+// 打开分类明细抽屉。
 async function openDetail(row: any, type: string) {
   activeCategory.value = row
   activeDetailType.value = type
@@ -518,6 +536,7 @@ async function openDetail(row: any, type: string) {
   await loadDetailBills()
 }
 
+// 加载分类明细下的账单列表。
 async function loadDetailBills() {
   if (!activeCategory.value) return
   detailLoading.value = true
@@ -540,6 +559,7 @@ async function loadDetailBills() {
     if (includeChildren.value || row.parentId) {
       params.categoryId = row.categoryId
     } else {
+      // 点击一级分类时可以按父分类查询，勾选“包含二级分类”时改按具体分类 id 查询。
       params.parentCategoryId = row.categoryId
     }
     detailBills.value = await request.get('/api/bills', { params })
@@ -548,6 +568,7 @@ async function loadDetailBills() {
   }
 }
 
+// 明细抽屉需要账本、账户、分类名称，所以打开前加载这些字典。
 async function loadDetailDictionaries() {
   const [expenseCategories, incomeCategories] = await Promise.all([
     request.get('/api/categories', { params: { bookId: selectedBookId.value || currentBookId.value, categoryType: 'EXPENSE' } }),
@@ -565,15 +586,18 @@ async function loadDetailDictionaries() {
   accounts.value = Array.from(new Map(merged.map((item: any) => [item.id, item])).values())
 }
 
+// 打开账单详情弹窗。
 function openBillDialog(bill: any) {
   selectedDetailBill.value = bill
   billDialogVisible.value = true
 }
 
+// 根据账单分类 id 找到图标。
 function categoryIconByBill(bill: any) {
   return categoryIcon(categoryItemMap.value[bill.categoryId] || activeCategory.value || {})
 }
 
+// 来源类型标签格式化，兼容历史中文值。
 function sourceTypeLabel(value?: string) {
   const normalized = String(value || '').trim().toUpperCase()
   if (normalized === 'AUTO' || value === '自动记账') return '自动记账'

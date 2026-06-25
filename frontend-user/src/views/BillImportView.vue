@@ -18,11 +18,12 @@
           <el-option v-for="book in books" :key="book.id" :label="book.bookName" :value="book.id" />
         </el-select>
         <el-upload
-          :auto-upload="false"
+          :auto-upload="false" 
           :show-file-list="false"
           accept=".xlsx,.xls"
           :on-change="handleFileChange"
         >
+        <!-- auto-upload=false 表示 Element Plus 不自动上传，文件选择后由 handleFileChange 控制 -->
           <el-button :icon="UploadFilled" type="primary" plain :loading="loading.preview">选择Excel</el-button>
         </el-upload>
         <el-button :disabled="!rows.length" @click="toggleAll">{{ isAllSelected ? '取消全选' : '全选' }}</el-button>
@@ -196,19 +197,24 @@ const categories = ref<any[]>([])
 const loading = ref({ preview: false, importing: false })
 
 const selectedRows = computed(() => rows.value.filter((row) => row.selected && row.valid))
+// 判断是否已经选中了所有可导入行，用来切换“全选/取消全选”按钮。
 const isAllSelected = computed(() => rows.value.length > 0 && rows.value.every((row) => row.selected || !row.valid))
+// 统计需要自动创建的账户名称，导入前弹窗提示用户确认。
 const missingAccounts = computed(() =>
   Array.from(new Set(selectedRows.value.filter((row) => row.accountMissing).map((row) => row.accountName).filter(Boolean)))
 )
 
+// 金额展示统一保留两位小数。
 function money(value: number | string) {
   return Number(value || 0).toFixed(2)
 }
 
+// 根据当前行的收支类型筛出对应分类。
 function categoriesByType(type: string) {
   return categories.value.filter((item) => item.categoryType === type)
 }
 
+// 加载导入预览需要的账户和分类数据。
 async function loadReferenceData() {
   if (!targetBookId.value) return
   const [accountList, expenseCategories, incomeCategories] = await Promise.all([
@@ -220,11 +226,13 @@ async function loadReferenceData() {
   categories.value = [...expenseCategories, ...incomeCategories]
 }
 
+// 用户切换目标账本后，重新加载参考数据并重映射预览行。
 async function handleBookChange() {
   await loadReferenceData()
   remapRowsForBook()
 }
 
+// 选择 Excel 文件后提交给后端解析预览。
 async function handleFileChange(file: any) {
   if (!targetBookId.value) {
     ElMessage.warning('请先选择账本')
@@ -233,9 +241,10 @@ async function handleFileChange(file: any) {
   loading.value.preview = true
   try {
     await loadReferenceData()
-    const formData = new FormData()
+    const formData = new FormData() // 浏览器上传文件常用对象
     formData.append('bookId', String(targetBookId.value))
     formData.append('file', file.raw)
+    // 预览阶段只解析 Excel，不直接入库；用户可以在页面上删除、改分类、改账户后再确认导入。
     preview.value = await request.post('/api/bills/import/preview', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -248,6 +257,7 @@ async function handleFileChange(file: any) {
   }
 }
 
+// 全选或取消全选所有有效预览行。
 function toggleAll() {
   const next = !isAllSelected.value
   rows.value.forEach((row) => {
@@ -255,6 +265,7 @@ function toggleAll() {
   })
 }
 
+// 行内修改收支类型后，自动给该行匹配一个默认分类。
 function syncRowCategory(row: any) {
   const first = categoriesByType(row.billType)[0]
   row.categoryId = first?.id
@@ -262,11 +273,13 @@ function syncRowCategory(row: any) {
   row.valid = Boolean(row.categoryId && row.accountName && row.amount && row.billDate)
 }
 
+// 行内修改分类后，同步分类名称和有效状态。
 function syncRowCategoryName(row: any) {
   row.categoryName = categories.value.find((item) => item.id === row.categoryId)?.categoryName || '未匹配分类'
   row.valid = Boolean(row.categoryId && row.accountName && row.amount && row.billDate)
 }
 
+// 行内修改账户后，同步账户名称、缺失标记和有效状态。
 function syncRowAccountName(row: any) {
   const account = accounts.value.find((item) => item.id === row.accountId)
   row.accountName = account?.accountName || row.accountName || '未知账户'
@@ -274,8 +287,10 @@ function syncRowAccountName(row: any) {
   row.valid = Boolean(row.categoryId && row.accountName && row.amount && row.billDate)
 }
 
+// 切换目标账本后，所有预览行都要重新匹配账本、账户和分类。
 function remapRowsForBook() {
   const book = books.value.find((item) => item.id === targetBookId.value)
+  // 切换目标账本后重新匹配账户和分类，避免把上一账本的 id 带到新账本里。
   rows.value.forEach((row) => {
     row.bookId = targetBookId.value
     row.bookName = book?.bookName || row.bookName
@@ -296,6 +311,7 @@ function remapRowsForBook() {
   preview.value && (preview.value.matched = rows.value.filter((row) => row.valid).length)
 }
 
+// 删除当前选中的预览行，只影响待导入列表，不会删除数据库账单。
 async function removeSelectedRows() {
   if (!selectedRows.value.length) return
   await ElMessageBox.confirm(`确认删除已选的 ${selectedRows.value.length} 条识别记录？删除后不会导入。`, '删除识别记录', {
@@ -310,6 +326,7 @@ async function removeSelectedRows() {
   persistImportWorkspace()
 }
 
+// 预览行变化后重新计算统计摘要。
 function refreshPreviewSummary() {
   if (!preview.value) return
   preview.value.total = rows.value.length
@@ -322,6 +339,7 @@ function refreshPreviewSummary() {
     .reduce((sum, row) => sum + Number(row.amount || 0), 0)
 }
 
+// 保存导入工作区到 localStorage，避免用户刷新页面后丢失预览结果。
 function persistImportWorkspace() {
   writeImportWorkspace({
     targetBookId: targetBookId.value,
@@ -331,6 +349,7 @@ function persistImportWorkspace() {
   })
 }
 
+// 进入页面时尝试恢复上次未完成的导入工作区。
 function restoreImportWorkspace() {
   const data = readImportWorkspace()
   if (!data) return
@@ -342,6 +361,7 @@ function restoreImportWorkspace() {
   activeRow.value = rows.value.find((row) => row.rowNo === data.activeRowNo) || rows.value[0]
 }
 
+// 将用户勾选的预览行提交给后端，真正写入账单表。
 async function importSelected() {
   if (!selectedRows.value.length) {
     ElMessage.warning('请选择要导入的账单')
@@ -375,6 +395,7 @@ async function importSelected() {
   const importingRows = [...selectedRows.value]
   loading.value.importing = true
   try {
+    // 真正导入时只提交当前选中的行，后端逐行转成标准账单。
     const count = await request.post('/api/bills/import', { rows: importingRows })
     ElMessage.success(`已导入 ${count} 条账单`)
     await loadReferenceData()
@@ -387,16 +408,19 @@ async function importSelected() {
   }
 }
 
+// 没有预览数据时，导入目标账本跟随当前账本。
 watch(currentBookId, (value) => {
   if (!preview.value) {
     targetBookId.value = value
   }
 }, { immediate: true })
 
+// 导入工作区的关键状态变化后，自动持久化到本地。
 watch([preview, rows, activeRow, targetBookId], () => {
   persistImportWorkspace()
 }, { deep: true })
 
+// 页面加载：恢复工作区、加载账本、加载参考数据，并重新匹配预览行。
 onMounted(async () => {
   restoreImportWorkspace()
   await loadBooks()

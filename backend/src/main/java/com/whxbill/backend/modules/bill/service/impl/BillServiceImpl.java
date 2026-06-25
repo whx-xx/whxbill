@@ -69,6 +69,9 @@ public class BillServiceImpl implements BillService {
     private final SimpMessagingTemplate messagingTemplate;
     private final RedisCacheSupport redisCacheSupport;
 
+    /**
+     * 分页查询账单列表，所有查询条件统一由 buildBillQueryWrapper 组装。
+     */
     @Override
     public PageResult<BizBill> pageBills(BillPageQuery pageQuery) {
         Page<BizBill> page = bizBillMapper.selectPage(
@@ -77,6 +80,9 @@ public class BillServiceImpl implements BillService {
         return new PageResult<>(page.getTotal(), page.getRecords());
     }
 
+    /**
+     * 根据当前筛选条件汇总收入、支出和结余，供账单列表顶部统计卡使用。
+     */
     @Override
     public Map<String, BigDecimal> summaryBills(BillPageQuery pageQuery) {
         List<BizBill> bills = bizBillMapper.selectList(buildBillQueryWrapper(pageQuery));
@@ -95,6 +101,9 @@ public class BillServiceImpl implements BillService {
         );
     }
 
+    /**
+     * 导出账单时，把账本、账户、分类 id 转换成中文名称，生成 Excel 行对象。
+     */
     @Override
     public List<BillExportRow> exportBills(BillPageQuery pageQuery) {
         List<BizBill> bills = bizBillMapper.selectList(buildBillQueryWrapper(pageQuery));
@@ -106,6 +115,7 @@ public class BillServiceImpl implements BillService {
                 .eq(BizBook::getUserId, userId))
             .stream()
             .collect(Collectors.toMap(BizBook::getId, Function.identity(), (left, right) -> left));
+        // 预先查出字典表，避免每一条账单循环里重复查数据库。
         Map<Long, BizAccount> accountMap = bizAccountMapper.selectList(new LambdaQueryWrapper<BizAccount>()
                 .eq(BizAccount::getUserId, userId))
             .stream()
@@ -135,6 +145,9 @@ public class BillServiceImpl implements BillService {
             .toList();
     }
 
+    /**
+     * Excel 导入预览：解析微信账单文件并返回可编辑的预览行，暂时不写入账单表。
+     */
     @Override
     public BillImportPreviewResponse previewImport(Long bookId, MultipartFile file) {
         if (bookId == null) {
@@ -152,6 +165,7 @@ public class BillServiceImpl implements BillService {
         }
 
         List<List<String>> sheetRows = readExcelRows(file);
+        // 微信账单导出的表头位置不固定，所以先逐行扫描定位“交易时间/收支/金额”等列。
         Map<String, Integer> header = findHeader(sheetRows);
         if (header.isEmpty()) {
             throw new BusinessException("未识别到微信账单表头，请确认文件包含交易时间、收/支、金额等列");
@@ -175,6 +189,7 @@ public class BillServiceImpl implements BillService {
             if (raw.stream().allMatch(String::isBlank)) {
                 continue;
             }
+            // 每一行原始 Excel 数据都会被转换成 BillImportRow，里面带有匹配结果和错误提示。
             BillImportRow row = buildImportRow(index + 1, raw, header, book, accounts, categories);
             if (row.getAmount() != null && row.getAmount().compareTo(BigDecimal.ZERO) > 0) {
                 rows.add(row);
@@ -201,6 +216,9 @@ public class BillServiceImpl implements BillService {
             .build();
     }
 
+    /**
+     * 确认导入：只导入前端勾选的预览行，逐行复用 saveBill 保证余额、预算和缓存都同步更新。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer importBills(BillImportRequest request) {
@@ -209,6 +227,7 @@ public class BillServiceImpl implements BillService {
             if (!Boolean.TRUE.equals(row.getSelected())) {
                 continue;
             }
+            // 只导入预览页被用户勾选且字段完整的行，识别失败或用户删除的行不会入库。
             if (row.getBookId() == null || row.getCategoryId() == null
                 || row.getAmount() == null || row.getBillDate() == null || row.getBillType() == null) {
                 throw new BusinessException("第 " + row.getRowNo() + " 行账单信息不完整");
@@ -225,12 +244,16 @@ public class BillServiceImpl implements BillService {
             saveRequest.setMerchantName(row.getMerchantName());
             saveRequest.setRemark(row.getRemark());
             saveRequest.setSourceType("IMPORT");
+            // 复用标准保存逻辑，导入账单和手动账单拥有一致的校验、余额变化和预算刷新。
             saveBill(saveRequest);
             count++;
         }
         return count;
     }
 
+    /**
+     * 使用 EasyExcel 把上传文件读成二维字符串列表。
+     */
     private List<List<String>> readExcelRows(MultipartFile file) {
         List<List<String>> rows = new ArrayList<>();
         try {
@@ -240,6 +263,7 @@ public class BillServiceImpl implements BillService {
                     int maxIndex = data.keySet().stream().max(Integer::compareTo).orElse(0);
                     List<String> row = new ArrayList<>();
                     for (int index = 0; index <= maxIndex; index++) {
+                        // 每个单元格都先清理空白和 BOM，后续表头匹配更稳定。
                         row.add(cleanCell(data.get(index)));
                     }
                     rows.add(row);
@@ -255,6 +279,9 @@ public class BillServiceImpl implements BillService {
         return rows;
     }
 
+    /**
+     * 从微信账单 Excel 中定位表头列，表头不一定在第一行，所以逐行扫描。
+     */
     private Map<String, Integer> findHeader(List<List<String>> rows) {
         for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
             List<String> row = rows.get(rowIndex);
@@ -274,6 +301,7 @@ public class BillServiceImpl implements BillService {
                 if (value.contains("备注")) header.put("remark", column);
             }
             if (header.containsKey("tradeTime") && header.containsKey("direction") && header.containsKey("amount")) {
+                // 找到关键字段后记录表头所在行，后续从下一行开始读取真实流水。
                 header.put("__rowIndex", rowIndex);
                 return header;
             }
@@ -281,6 +309,9 @@ public class BillServiceImpl implements BillService {
         return Map.of();
     }
 
+    /**
+     * 把一行 Excel 原始数据转换成可预览、可修改、可导入的 BillImportRow。
+     */
     private BillImportRow buildImportRow(int rowNo, List<String> raw, Map<String, Integer> header, BizBook book,
                                          List<BizAccount> accounts, List<BizCategory> categories) {
         String tradeTime = cell(raw, header, "tradeTime");
@@ -296,9 +327,11 @@ public class BillServiceImpl implements BillService {
         String remark = cell(raw, header, "remark");
 
         String combinedText = tradeType + " " + counterparty + " " + goods + " " + remark + " " + tradeStatus;
+        // 根据收/支列和交易文本推断账单类型。
         String billType = inferBillType(direction, combinedText);
         BigDecimal amount = parseAmount(amountText);
         LocalDateTime dateTime = parseTradeTime(tradeTime);
+        // 支付方式会先被转成账户名称，再与当前账本已有账户匹配。
         String suggestedAccountName = inferAccountName(paymentMethod);
         BizAccount account = matchAccount(suggestedAccountName, paymentMethod, accounts);
         BizCategory category = matchCategory(billType, combinedText, dateTime, categories);
@@ -327,6 +360,7 @@ public class BillServiceImpl implements BillService {
         boolean statusImportable = isImportableTradeStatus(tradeStatus);
         boolean valid = amount != null && dateTime != null && category != null && row.getAccountName() != null && !row.getAccountName().isBlank()
             && statusImportable;
+        // valid 表示后端已经识别到导入所需的关键字段，前端默认只勾选 valid 行。
         row.setValid(valid);
         row.setSelected(valid);
         if (valid && "EXPENSE".equals(billType) && isRefundStatus(tradeStatus)) {
@@ -339,6 +373,9 @@ public class BillServiceImpl implements BillService {
         return row;
     }
 
+    /**
+     * 判断微信交易状态是否适合导入，失败、关闭等流水不进入账本。
+     */
     private boolean isImportableTradeStatus(String tradeStatus) {
         return tradeStatus == null || tradeStatus.isBlank()
             || tradeStatus.contains("成功")
@@ -351,10 +388,16 @@ public class BillServiceImpl implements BillService {
             || tradeStatus.contains("资金已到账");
     }
 
+    /**
+     * 判断是否是退款状态；退款流水默认不勾选，避免重复计算支出。
+     */
     private boolean isRefundStatus(String tradeStatus) {
         return tradeStatus != null && (tradeStatus.contains("已全额退款") || tradeStatus.contains("已退款"));
     }
 
+    /**
+     * 生成导入预览行的错误原因，方便前端展示为什么不能导入。
+     */
     private String importErrorMessage(BigDecimal amount, LocalDateTime dateTime, BizCategory category, String tradeStatus, boolean statusImportable) {
         List<String> reasons = new ArrayList<>();
         if (amount == null) reasons.add("金额无法识别");
@@ -364,6 +407,9 @@ public class BillServiceImpl implements BillService {
         return reasons.isEmpty() ? "信息不完整" : String.join("，", reasons);
     }
 
+    /**
+     * 导入时解析账户：优先使用预览行已有账户 id，没有则按名称查找或自动创建账户。
+     */
     private BizAccount resolveImportAccount(BillImportRow row) {
         Long userId = SecurityUtils.getUserId();
         if (row.getAccountId() != null) {
@@ -386,6 +432,7 @@ public class BillServiceImpl implements BillService {
         if (existing != null) {
             return existing;
         }
+        // 微信账单里出现的新支付方式会自动创建为账户，减少用户导入前的准备工作。
         BizAccount account = new BizAccount();
         account.setUserId(userId);
         account.setBookId(row.getBookId());
@@ -398,6 +445,9 @@ public class BillServiceImpl implements BillService {
         return account;
     }
 
+    /**
+     * 老数据兼容：如果用户没有任何分类，导入前补一批基础分类。
+     */
     private void ensureDefaultCategories(Long userId) {
         Long categoryCount = bizCategoryMapper.selectCount(new LambdaQueryWrapper<BizCategory>()
             .eq(BizCategory::getUserId, userId));
@@ -431,6 +481,9 @@ public class BillServiceImpl implements BillService {
         }
     }
 
+    /**
+     * 根据推断账户名和原始支付方式，在当前账本账户列表里找最匹配的账户。
+     */
     private BizAccount matchAccount(String accountName, String paymentMethod, List<BizAccount> accounts) {
         String target = accountName == null ? "" : accountName.toLowerCase(Locale.ROOT);
         String raw = paymentMethod == null ? "" : paymentMethod.toLowerCase(Locale.ROOT);
@@ -443,6 +496,9 @@ public class BillServiceImpl implements BillService {
             .orElse(null);
     }
 
+    /**
+     * 从微信支付方式文本推断账户名称。
+     */
     private String inferAccountName(String paymentMethod) {
         String value = paymentMethod == null ? "" : paymentMethod;
         if (value.contains("零钱通")) return "零钱通";
@@ -454,6 +510,9 @@ public class BillServiceImpl implements BillService {
         return value.isBlank() || "/".equals(value) ? "微信" : value;
     }
 
+    /**
+     * 根据收支方向和交易关键词推断账单类型。
+     */
     private String inferBillType(String direction, String text) {
         if (direction != null && direction.contains("收入")) {
             return "INCOME";
@@ -471,18 +530,27 @@ public class BillServiceImpl implements BillService {
         return "EXPENSE";
     }
 
+    /**
+     * 根据账户名称推断账户类型。
+     */
     private String inferAccountType(String accountName) {
         if (accountName.contains("信用卡")) return "CREDIT";
         if (accountName.contains("银行卡") || accountName.contains("银行")) return "BANK";
         return "CASH";
     }
 
+    /**
+     * 给自动创建的账户选择一个默认颜色。
+     */
     private String inferAccountColor(String accountName) {
         if (accountName.contains("支付宝")) return "#1677ff";
         if (accountName.contains("银行")) return "#4f6bed";
         return "#20a995";
     }
 
+    /**
+     * 分类匹配：先看交易文本是否包含分类名，匹配不到再按关键词推断。
+     */
     private BizCategory matchCategory(String billType, String text, LocalDateTime dateTime, List<BizCategory> categories) {
         List<BizCategory> sameType = categories.stream()
             .filter(category -> billType.equals(category.getCategoryType()))
@@ -494,6 +562,9 @@ public class BillServiceImpl implements BillService {
             .orElseGet(() -> inferCategory(billType, key, dateTime, sameType));
     }
 
+    /**
+     * 根据交易文本和时间推断分类，例如餐饮按时间进一步分早餐/午餐/晚餐。
+     */
     private BizCategory inferCategory(String billType, String text, LocalDateTime dateTime, List<BizCategory> categories) {
         if ("INCOME".equals(billType)) {
             if (containsAny(text, "工资", "薪资")) return findCategory(categories, "工资");
@@ -540,6 +611,9 @@ public class BillServiceImpl implements BillService {
         return findCategory(categories, "其他", "食品餐饮");
     }
 
+    /**
+     * 按名称依次查找分类，找不到时返回当前类型下第一个分类兜底。
+     */
     private BizCategory findCategory(List<BizCategory> categories, String... names) {
         for (String name : names) {
             Optional<BizCategory> matched = categories.stream()
@@ -552,6 +626,9 @@ public class BillServiceImpl implements BillService {
         return categories.isEmpty() ? null : categories.get(0);
     }
 
+    /**
+     * 判断文本是否包含任意关键词。
+     */
     private boolean containsAny(String text, String... keywords) {
         for (String keyword : keywords) {
             if (text.contains(keyword)) {
@@ -561,15 +638,24 @@ public class BillServiceImpl implements BillService {
         return false;
     }
 
+    /**
+     * 按表头 key 读取某一列内容。
+     */
     private String cell(List<String> raw, Map<String, Integer> header, String key) {
         Integer index = header.get(key);
         return index == null || index >= raw.size() ? "" : cleanCell(raw.get(index));
     }
 
+    /**
+     * 清理 Excel 单元格内容。
+     */
     private String cleanCell(String value) {
         return value == null ? "" : value.trim().replace("\uFEFF", "");
     }
 
+    /**
+     * 解析金额，去掉货币符号和千分位，统一为正数金额。
+     */
     private BigDecimal parseAmount(String value) {
         String normalized = value == null ? "" : value.replace("¥", "").replace("￥", "").replace(",", "").trim();
         if (normalized.isBlank() || "/".equals(normalized)) {
@@ -582,6 +668,9 @@ public class BillServiceImpl implements BillService {
         }
     }
 
+    /**
+     * 解析微信账单里的交易时间，兼容多种日期格式。
+     */
     private LocalDateTime parseTradeTime(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -600,6 +689,9 @@ public class BillServiceImpl implements BillService {
         return null;
     }
 
+    /**
+     * 返回第一个非空字符串，导入字段兜底时使用。
+     */
     private String firstNotBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank() && !"/".equals(value.trim())) {
@@ -609,6 +701,9 @@ public class BillServiceImpl implements BillService {
         return "微信账单";
     }
 
+    /**
+     * 构造账单查询条件，列表、汇总、导出都复用同一套筛选逻辑。
+     */
     private LambdaQueryWrapper<BizBill> buildBillQueryWrapper(BillPageQuery pageQuery) {
         String keyword = pageQuery.getKeyword();
         List<Long> childCategoryIds = pageQuery.getParentCategoryId() == null ? List.of() : bizCategoryMapper
@@ -621,6 +716,8 @@ public class BillServiceImpl implements BillService {
         List<Long> categoryIds = pageQuery.getParentCategoryId() == null
             ? List.of()
             : java.util.stream.Stream.concat(java.util.stream.Stream.of(pageQuery.getParentCategoryId()), childCategoryIds.stream()).toList();
+        // 如果前端传的是 categoryId，就是查某个具体分类
+        // 如果前端传的是 parentCategoryId，后端会先查这个一级分类下面的所有子分类
         return new LambdaQueryWrapper<BizBill>()
             .eq(BizBill::getUserId, SecurityUtils.getUserId())
             .eq(pageQuery.getBookId() != null, BizBill::getBookId, pageQuery.getBookId())
@@ -640,6 +737,9 @@ public class BillServiceImpl implements BillService {
             .orderByDesc(BizBill::getId);
     }
 
+    /**
+     * 新增或修改账单：校验归属 -> 保存账单 -> 调整账户余额 -> 刷新预算和统计缓存。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BizBill saveBill(BillSaveRequest request) {
@@ -698,6 +798,7 @@ public class BillServiceImpl implements BillService {
         }
 
         if (oldBill != null) {
+            // 修改账单时先撤销旧账单对账户余额的影响，再应用新账单影响。
             adjustAccountBalance(oldAccountId, oldBillType, oldAmount.negate(), userId);
             refreshBudgetUsage(oldBookId, oldBillDate);
         }
@@ -707,6 +808,9 @@ public class BillServiceImpl implements BillService {
         return bill;
     }
 
+    /**
+     * 把来源编码转换成页面和 Excel 里更友好的中文名称。
+     */
     private String displaySourceType(String sourceType) {
         String normalized = normalizeSourceType(sourceType);
         if (SOURCE_TYPE_AUTO.equals(normalized)) {
@@ -721,6 +825,9 @@ public class BillServiceImpl implements BillService {
         return "\u624b\u52a8\u8bb0\u8d26";
     }
 
+    /**
+     * 兼容历史中文值和英文值，统一成 MANUAL/IMPORT/OCR/AUTO。
+     */
     private String normalizeSourceType(String sourceType) {
         if (!hasText(sourceType)) {
             return SOURCE_TYPE_MANUAL;
@@ -738,6 +845,9 @@ public class BillServiceImpl implements BillService {
         return SOURCE_TYPE_MANUAL.equals(normalized) || "手动记账".equals(sourceType) ? SOURCE_TYPE_MANUAL : sourceType.trim();
     }
 
+    /**
+     * 删除单条账单，并同步回滚账户余额、刷新预算和统计缓存。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteBill(Long billId) {
@@ -754,6 +864,9 @@ public class BillServiceImpl implements BillService {
         clearDashboardCache(userId);
     }
 
+    /**
+     * 批量删除账单，复用单条删除逻辑保证副作用一致。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteBills(List<Long> billIds) {
@@ -761,6 +874,9 @@ public class BillServiceImpl implements BillService {
         billIds.forEach(this::deleteBill);
     }
 
+    /**
+     * 日历视图按日期读取账单列表。
+     */
     @Override
     public List<BizBill> listBillsByDate(String date, Long bookId) {
         return bizBillMapper.selectList(new LambdaQueryWrapper<BizBill>()
@@ -770,6 +886,9 @@ public class BillServiceImpl implements BillService {
             .orderByDesc(BizBill::getId));
     }
 
+    /**
+     * 根据账单类型调整账户余额：收入加，支出减。
+     */
     private void adjustAccountBalance(Long accountId, String billType, BigDecimal amount, Long userId) {
         BizAccount account = bizAccountMapper.selectOne(new LambdaQueryWrapper<BizAccount>()
             .eq(BizAccount::getId, accountId)
@@ -783,6 +902,9 @@ public class BillServiceImpl implements BillService {
         bizAccountMapper.updateById(account);
     }
 
+    /**
+     * 重新计算某账本某月份的预算已用金额，并在超支时推送提醒。
+     */
     private void refreshBudgetUsage(Long bookId, LocalDate billDate) {
         String budgetMonth = billDate.toString().substring(0, 7);
         Long userId = SecurityUtils.getUserId();
@@ -805,6 +927,7 @@ public class BillServiceImpl implements BillService {
 
         for (BizBudget budget : budgets) {
             BigDecimal usedAmount = expenseBills.stream()
+                // 总预算 categoryId 为 null，分类预算只统计该分类及其子分类账单。
                 .filter(bill -> budget.getCategoryId() == null || matchesBudgetCategory(budget.getCategoryId(), bill.getCategoryId(), categories))
                 .map(BizBill::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -816,6 +939,9 @@ public class BillServiceImpl implements BillService {
         }
     }
 
+    /**
+     * 判断账单分类是否命中预算分类，支持一级分类预算包含二级分类账单。
+     */
     private boolean matchesBudgetCategory(Long budgetCategoryId, Long billCategoryId, List<BizCategory> categories) {
         if (budgetCategoryId.equals(billCategoryId)) {
             return true;
@@ -825,10 +951,16 @@ public class BillServiceImpl implements BillService {
             .anyMatch(category -> budgetCategoryId.equals(category.getParentId()));
     }
 
+    /**
+     * 账单变化后清除当前用户统计缓存，避免统计页展示旧数据。
+     */
     private void clearDashboardCache(Long userId) {
         redisCacheSupport.deleteByPattern(StatisticsServiceImpl.DASHBOARD_CACHE_PREFIX + userId + ":*");
     }
 
+    /**
+     * 来源类型筛选兼容历史中文值和英文枚举值。
+     */
     private void applySourceTypeFilter(LambdaQueryWrapper<BizBill> wrapper, String sourceType) {
         String normalized = normalizeSourceType(sourceType);
         if (SOURCE_TYPE_MANUAL.equals(normalized)) {
@@ -866,6 +998,9 @@ public class BillServiceImpl implements BillService {
         wrapper.eq(BizBill::getSourceType, sourceType);
     }
 
+    /**
+     * 预算超支时写入站内消息，并通过 WebSocket 推送给当前用户。
+     */
     private void pushBudgetAlert(Long userId, String budgetMonth) {
         SysMessage message = new SysMessage();
         message.setUserId(userId);
@@ -874,10 +1009,15 @@ public class BillServiceImpl implements BillService {
         message.setContent("预算 " + budgetMonth + " 已超支，请留意支出。");
         message.setReadStatus(0);
         sysMessageMapper.insert(message);
+        // convertAndSendToUser 对应前端订阅的 /user/queue/notifications。
         messagingTemplate.convertAndSendToUser(String.valueOf(userId), "/queue/notifications", message);
+        // topic 通道用于兼容按用户 id 订阅的通知入口。
         messagingTemplate.convertAndSend("/topic/notifications/" + userId, message);
     }
 
+    /**
+     * 简单字符串非空判断，避免重复写 null 和 blank 判断。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
